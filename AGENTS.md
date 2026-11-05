@@ -190,4 +190,20 @@ m-tools/
 ## Git
 
 - 远程：`origin` = `git@github.com:sdttttt/m-tools.git`，主分支 `master`。
-- Commit message 用英文祈使句、小写开头，如 `add clipboard history tool`；一次提交聚焦一件事。
+- Commit message 必须符合 Conventional Commits 规范，四部分齐全：action（type）、scope、subject、body，格式为 `<type>(<scope>): <subject>` + 空行 + `<body>`：
+  - **type**（action）：`feat` / `fix` / `docs` / `refactor` / `test` / `chore` 等标准类型；
+  - **scope**：改动所在模块或工具域名，如 `mp4gif`、`ffmpeg`、`webview`、`theme`；跨多个模块时可省略括号部分，写 `<type>: <subject>`；
+  - **subject**：英文祈使句、小写开头、结尾不加句号，一句话说清改了什么；
+  - **body**：必填，空一行后写，说明动机与关键实现点（为什么改、怎么改的），英文、每行不超过 ~72 字符。
+- 示例：
+
+  ```
+  fix(ffmpeg): remove temp gif output when conversion fails
+
+  ConvertGIF created its temp output before ffmpeg ran but returned no
+  path on failure, leaving orphaned m-tools-*.gif files in the system
+  temp dir. Track self-created temp outputs and remove them on every
+  error path; caller-supplied outputs are still left untouched.
+  ```
+
+- 一次提交聚焦一件事；scope 即该件事的边界，不要在 body 里夹带无关改动。
