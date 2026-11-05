@@ -21,13 +21,13 @@
 
 ```
 ┌─ webview ──────────────┐        ┌─ Go 进程 ─────────────┐
-│ SolidJS (webview/src)  │  IPC   │ cmd/m-tools + services│──▶ 系统 API
-│  import { X } from     │◀──────▶│ mygo.Bind(X{})        │
+│ SolidJS (webview/src)  │  IPC   │ cmd/m-tools + internal│──▶ 系统 API
+│  import { X } from     │◀──────▶│ mygo.BindAs("X", ...) │
 │  "./mygo"  (生成物)     │ 类型化  │ mygo.NewEvent[T]      │
 └────────────────────────┘        └───────────────────────┘
 ```
 
-- Go 侧导出服务结构体，`cmd/m-tools/main.go` 中 `mygo.Bind(X{})` 注册；方法第一个字母大写即可被前端调用。
+- Go 侧在 `internal/<工具域名>/` 导出服务结构体（名字统一用 `Service`），在 `cmd/m-tools/main.go` 用 `mygo.BindAs("X", ...)` 注册；**`BindAs` 的名字就是前端看到的服务名**（生成物契约），方法第一个字母大写即可被前端调用。
 - `bun run generate` 从 Go 代码生成类型化客户端 **`webview/src/mygo.ts`**（生成物，**禁止手改**）。方法名转 camelCase，字段名遵循 Go struct 的 json tag（用 camelCase tag）。
 - 前端调用是 async：`const info = await System.info()`。
 - 事件（Go → 前端推送流）：`mygo.NewEvent[T]("name")` 声明，`Emit(win, v)` 发送；前端 `import { events } from "./mygo"` 后 `events.name.on(...)`。
@@ -39,8 +39,11 @@
 m-tools/
 ├── cmd/
 │   └── m-tools/
-│       └── main.go       # 应用入口：Bind 服务 + 窗口创建（保持薄）
-├── app.go                # 根包 mtools：应用元数据；go:embed 无法引用上级路径，
+│       └── main.go       # 应用入口：BindAs 服务 + 窗口创建（保持薄）
+├── internal/             # ⭐ 各工具的后端实现（一个工具一个包）
+│   ├── system/           # System 服务：主机信息 + 窗口主题（system.go / theme.go）
+│   └── mp4gif/           # MP4→GIF 服务：service / wire / media / files / events + reveal 平台文件
+├── app.go                # 根包 mtools：AppName/Version 等应用元数据；go:embed 无法引用上级路径，
 ├── assets_ffmpeg.go      #   所以 with_ffmpeg 的嵌入 hook（//go:build with_ffmpeg）留在根
 ├── go.mod                # module github.com/sdttttt/m-tools（main: ./cmd/m-tools）
 ├── mygo.config.ts        # MyGo 唯一配置（main/devCommand/buildCommand/bindings/out）
@@ -104,17 +107,17 @@ m-tools/
 - SolidJS 响应式红线：不要解构 props、不要用对象展开丢失响应性、粒度用 signal/memo 而非大状态对象。
 - 样式一律 Tailwind 工具类（solid-ui 体系）。语义色是 HSL token：唯一 CSS 文件 `webview/src/index.css`（@tailwind 指令 + `:root`/`.dark` 两套变量 + body 基础样式），`tailwind.config.cjs` 把 `bg-primary`、`text-muted-foreground` 等映射到 `hsl(var(--x))`。新增语义色：index.css 加变量（浅/深两套）→ 组件里直接用类名，tailwind 配置不用动。
 - 组件来自 solid-ui registry：`bunx solidui-cli add <name>`（CLI 在 Windows/bun 下装依赖有 bug——给 bun 传了空参数；绕过方式：抓 `https://www.solid-ui.com/registry/ui/<name>.json`，把 `files[].content` 落盘到 `src/components/ui/`，并把内容里的 `~/registry/ui` 改写为 `~/components/ui`）。
-- **主题机制**：`lib/theme.ts` 是唯一来源。模式 `light|dark|system` 持久化在 localStorage(`mtools-theme`)，默认跟随系统；解析结果以 `.dark` 类挂到 `<html>`（tailwind darkMode variant），并经 `System.setWindowTheme` IPC 同步原生窗口 chrome（背景色常量 `windowColors` 在 cmd/m-tools/main.go，与 index.css 的 `--background` 保持一致）。UI 切换器在 `components/ThemeToggle.tsx`。
+- **主题机制**：`lib/theme.ts` 是唯一来源。模式 `light|dark|system` 持久化在 localStorage(`mtools-theme`)，默认跟随系统；解析结果以 `.dark` 类挂到 `<html>`（tailwind darkMode variant），并经 `System.setWindowTheme` IPC 同步原生窗口 chrome（背景色常量在 `internal/system/theme.go`，与 index.css 的 `--background` 保持一致）。UI 切换器在 `components/ThemeToggle.tsx`。
 - Kobalte 表单注意：`TextField` 的 `value`/`onChange` 挂在 **Root** 上（onChange 收字符串）；`Select` 要传 `itemComponent` 且 `<SelectContent />` 必须渲染，否则下拉不显示；`ToggleGroup` 单选模式 value 是字符串不是数组。
 - `~/*` 别名指向 `webview/src`（tsconfig paths + vite alias；TS7 已移除 baseUrl，paths 直接相对 tsconfig 解析）。
-- 必须同时适配浅色/深色。**窗口 `BackgroundColor`（cmd/m-tools/main.go）与 `--bg` 保持一致**，避免启动闪白/闪黑。
+- 必须同时适配浅色/深色。**窗口 `BackgroundColor`（`system.WindowBackground()`，颜色常量在 `internal/system/theme.go`）与 `--bg` 保持一致**，避免启动闪白/闪黑。
 - `webview/src/mygo.ts` 的类型即 IPC 契约：Go 返回类型变更后先 `bun run generate` 再写前端。
 
 ### Go
 
 - 服务方法必须有 doc comment——它会出现在生成的 TS 客户端文档里。
 - struct 字段 json tag 用 camelCase。
-- `cmd/m-tools/main.go` 只做 Bind 与窗口装配；具体工具的实现放 `internal/<工具域名>/`（如 `internal/clipboard/`）。
+- `cmd/m-tools/main.go` 只做 `mygo.BindAs` 与窗口装配；具体工具的实现放 `internal/<工具域名>/`（如 `internal/clipboard/`），服务类型统一命名 `Service`，绑定名在 `BindAs` 里显式给出。
 - 平台相关代码用 build tag 分文件（`foo_windows.go` / `foo_darwin.go`），接口在无后缀文件中声明。
 
 ### 代码风格
@@ -147,12 +150,12 @@ m-tools/
 - 转换策略：两遍 palettegen/paletteuse（GIF 质量关键），FPS/宽度不超过源视频；进度经 `-progress pipe:1` 解析后通过 `mp4gifProgress` 事件推给前端（palette 占 30% / encode 占 70%）。
 - 截取范围：前端 `components/TrimTimeline.tsx` 是胶片时间轴（拖起点/终点手柄，拖选中段整体平移，方向键 ±0.1s、Shift ±1s），起点/终点数值输入框与之同步；缩略图经 `Mp4Gif.Thumbnails`（12 帧、160px 宽、data URL）加载，失败时退化为纯色轨道仍可拖拽。
 - 片段预览：「预览片段」按钮调 `Mp4Gif.Preview`（前 3 秒、宽度 ≤320、fps ≤15，质量沿用当前选择）生成小 GIF 以 data URL 内联展示并自动删除临时文件；取消与转换共用 `CancelActive`，两种任务互斥（`begin`/`end` 守卫）；裁剪或参数变化后旧预览自动失效。
-- mygo 服务包装（Bind/事件/对话框/取消/预览/保存）在 `cmd/m-tools/main.go`；一次只跑一个转换任务（`CancelActive`）。
+- mygo 服务包装在 `internal/mp4gif/`（`service.go` 生命周期与取消守卫、`wire.go` IPC 类型、`media.go` ffmpeg 桥接、`files.go` 对话框/保存/打开目录、`events.go` 进度事件、`reveal_*.go` 平台差异）；一次只跑一个任务（转换或预览，`CancelActive` 取消）。
 - 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
 
 ## 版本与构建
 
-- 版本号三处同步：`mygo.config.ts` 的 `version`、`cmd/m-tools/main.go` 的 `Version` 常量；发版时一并改。
+- 版本号同步：`mygo.config.ts` 的 `version` 与根包 `app.go` 的 `Version` 常量；发版时一并改。
 - `mygo build` 会把 `frontendDist`（`dist/`）嵌入二进制；`build/` 下产物按平台输出（macOS app bundle / Windows exe）。
 - 目标平台只有 darwin (amd64/arm64) 和 windows (amd64)；构建/签名/公证脚本将来单独安排。
 

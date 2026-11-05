@@ -106,8 +106,8 @@ export const System = {
  */
 export const Mp4Gif = {
   /**
-   * CancelActive stops the running conversion, if any. One conversion runs at
-   * a time, which is the natural model for a desktop toolbox.
+   * CancelActive stops the running conversion or preview, if any. One job
+   * runs at a time, which is the natural model for a desktop toolbox.
    */
   cancelActive(): Promise<void> {
     return call("Mp4Gif.CancelActive");

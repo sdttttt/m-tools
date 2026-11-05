@@ -7,3 +7,6 @@ package mtools
 
 // AppName is the human-facing app name, matching mygo.config.ts.
 const AppName = "M-Tools"
+
+// Version is the app version, kept in sync with mygo.config.ts.
+const Version = "0.1.0"
