@@ -14,5 +14,9 @@ export default defineConfig({
   buildCommand: "cd webview && bun run build",
   frontendDist: "webview/dist",
   bindings: "webview/src/mygo.ts",
+  // Ship the third-party license notices next to the executable
+  // (Contents/Resources on macOS): MIT/Apache-2.0 require the notice to
+  // accompany distributed copies.
+  resources: ["THIRD-PARTY-NOTICES.md"],
   out: "build",
 });

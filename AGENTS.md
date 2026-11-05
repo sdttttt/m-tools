@@ -80,6 +80,8 @@ m-tools/
 │   ├── icon.png
 │   └── bin/              # with_ffmpeg 构建时捆绑的 ffmpeg（gitignore，留 README）
 ├── build/                # mygo build 产物（gitignore）
+├── LICENSE               # 0BSD：只覆盖本仓库原创代码
+├── THIRD-PARTY-NOTICES.md # 分发产物内第三方组件的许可与版权声明
 ├── .agents/skills/mygo-maintenance/  # MyGo 维护 skill（脚手架自带）
 └── AGENTS.md
 ```
@@ -174,6 +176,15 @@ m-tools/
 3. 改过 Go 服务：`bun run generate`，检查 `webview/src/mygo.ts` 的 diff
 4. UI 或 IPC 改动：`bun run dev` 实际跑一次，确认窗口、深浅色、IPC 调用正常
 5. MyGo 生命周期/并发改动：`go tool mygo vet .`
+
+## 许可
+
+- 原创代码以 **0BSD** 发布（`LICENSE`，版权行 `Copyright (C) 2026 sdttttt`）：零条件、无署名要求，也不含商标授权。
+- 分发产物里的第三方组件**不是** 0BSD：Go 侧 mygo（MIT）、purego（Apache-2.0）、`golang.org/x/*` 与标准库（BSD-3-Clause）；前端 bundle 多数为 MIT，另有 `class-variance-authority`、`@internationalized/number`（Apache-2.0）。完整清单、版权行与许可全文在 `THIRD-PARTY-NOTICES.md`。
+- `THIRD-PARTY-NOTICES.md` 通过 `mygo.config.ts` 的 `resources` 随应用复制到可执行文件旁（macOS 为 `Contents/Resources`）；改名或删掉该配置会让 MIT / Apache-2.0 的声明缺失。
+- `webview/src/components/ui/` 与 `webview/src/lib/utils.ts` 是复制的 solid-ui / shadcn 代码，保留 MIT 与原作者版权，不能按 0BSD 重标；新增 registry 组件时同样处理。
+- 新增任何会进入二进制或前端 bundle 的依赖后，先确认无 copyleft（GPL / AGPL / MPL / EPL），再把版权行补进 `THIRD-PARTY-NOTICES.md`；仅构建期依赖列在单独小节，不进产物。
+- `-tags with_ffmpeg` 捆绑 ffmpeg 等于分发第三方二进制：发行包需附 ffmpeg 自身许可与源码获取方式，且只用 `--disable-gpl --disable-nonfree` 的 LGPL 构建。
 
 ## Git
 
