@@ -73,6 +73,12 @@
   * {
     @apply border-border;
   }
+  /* WKWebView can skip painting the native selection highlight entirely;
+     an explicit ::selection forces its custom-draw path and keeps the
+     color theme-aware (primary at low alpha reads on both modes). */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.32);
+  }
   body {
     @apply bg-background text-foreground;
     font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
