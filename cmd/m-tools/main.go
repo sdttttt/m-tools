@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo"
 	mtools "github.com/sdttttt/m-tools"
 	"github.com/sdttttt/m-tools/internal/imgconv"
+	"github.com/sdttttt/m-tools/internal/imgopt"
 	"github.com/sdttttt/m-tools/internal/imgresize"
 	"github.com/sdttttt/m-tools/internal/mp4gif"
 	"github.com/sdttttt/m-tools/internal/system"
@@ -21,6 +22,7 @@ func main() {
 	mygo.BindAs("Mp4Gif", &mp4gif.Service{})
 	mygo.BindAs("ImageConv", &imgconv.Service{})
 	mygo.BindAs("ImageResize", &imgresize.Service{})
+	mygo.BindAs("ImageOptimize", &imgopt.Service{})
 
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{

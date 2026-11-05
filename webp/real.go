@@ -35,3 +35,9 @@ func Encode(w *bytes.Buffer, m image.Image, quality int) error {
 	_, err = w.Write(data)
 	return err
 }
+
+// EncodeLossless writes m to w as a lossless WebP image (VP8L): the
+// decoder output is bit-identical to the encoder input.
+func EncodeLossless(m image.Image) ([]byte, error) {
+	return webp.EncodeLosslessRGBA(m)
+}

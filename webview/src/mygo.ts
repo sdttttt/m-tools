@@ -78,6 +78,33 @@ export interface Info {
   skipReason: string;
 }
 
+/**
+ * OptimizeRequest asks for one lossless image optimization. It has no
+ * options: the tool always keeps pixels identical and the output format
+ * identical to the source.
+ */
+export interface OptimizeRequest {
+  path: string;
+}
+
+/**
+ * OptimizeResult reports one optimization attempt. OutputPath is the -min
+ * file written next to the source (empty when NotNeeded or Skipped — no
+ * file was written in either case). PreviewDataURL inlines the optimized
+ * image as a data URL for small files.
+ */
+export interface OptimizeResult {
+  outputPath: string;
+  format: string;
+  originalBytes: number;
+  optimizedBytes: number;
+  durationMs: number;
+  previewDataURL: string;
+  /** nothing to shave; output would be >= source */
+  notNeeded: boolean;
+  skipReason: string;
+}
+
 /** PreviewRequest asks for a quick low-resolution preview of a clip range. */
 export interface PreviewRequest {
   path: string;
@@ -363,6 +390,60 @@ export const ImageResize = {
    */
   targetNames(): Promise<string[]> {
     return call("ImageResize.TargetNames");
+  },
+} as const;
+
+/**
+ * Service is the lossless image optimization tool. Optimizations run one
+ * at a time (the page drives a batch as a sequence of single Optimize
+ * calls), guarded by the same begin/end pattern as the other image tools.
+ */
+export const ImageOptimize = {
+  /** CancelActive stops the running optimization, if any. */
+  cancelActive(): Promise<void> {
+    return call("ImageOptimize.CancelActive");
+  },
+  /** OpenFolder reveals the file's folder in the OS file manager. */
+  openFolder(path: string): Promise<void> {
+    return call("ImageOptimize.OpenFolder", path);
+  },
+  /**
+   * Optimize optimizes one image losslessly (pixels stay identical) and
+   * writes the result as a -min file next to the source. When nothing can
+   * be shaved the result comes back with NotNeeded set and no file written;
+   * animated sources and BMP files come back with SkipReason. ctx
+   * cancellation (CancelActive) stops the current image between stages.
+   */
+  optimize(req: OptimizeRequest): Promise<OptimizeResult> {
+    return call("ImageOptimize.Optimize", req);
+  },
+  /**
+   * PickImages shows a native multi-select dialog and returns the chosen
+   * paths, or nil when canceled.
+   */
+  pickImages(): Promise<string[]> {
+    return call("ImageOptimize.PickImages");
+  },
+  /**
+   * Probe reads metadata of one picked image. It never errors: unsupported
+   * sources come back flagged so the page can show them as skipped rows.
+   */
+  probe(path: string): Promise<Info> {
+    return call("ImageOptimize.Probe", path);
+  },
+  /**
+   * SaveAs shows a native save dialog and copies the optimized image there.
+   * Returns the destination path, or "" when canceled.
+   */
+  saveAs(source: string, defaultName: string): Promise<string> {
+    return call("ImageOptimize.SaveAs", source, defaultName);
+  },
+  /**
+   * Supported reports whether WebP decode/encode is compiled into this build
+   * (with_webp tag). WebP sources are skipped with a hint on default builds.
+   */
+  supported(): Promise<boolean> {
+    return call("ImageOptimize.Supported");
   },
 } as const;
 

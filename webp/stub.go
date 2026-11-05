@@ -25,3 +25,6 @@ func DecodeConfig(r io.Reader) (image.Config, error) { return image.Config{}, Er
 
 // Encode always returns ErrUnsupported on default builds.
 func Encode(w *bytes.Buffer, m image.Image, quality int) error { return ErrUnsupported }
+
+// EncodeLossless always returns ErrUnsupported on default builds.
+func EncodeLossless(m image.Image) ([]byte, error) { return nil, ErrUnsupported }

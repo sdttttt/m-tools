@@ -11,6 +11,18 @@ import (
 // (lossy VP8, lossless VP8L, extended VP8X). `?` wildcards the size field.
 const webpMagic = "RIFF????WEBP"
 
+// Detect reports a file's canonical format id (png, jpg, gif, webp, bmp,
+// tiff) by magic bytes, for callers that need the format without the full
+// Probe (known=false means unrecognizable; the error carries a specific
+// hint such as webp on a stub build).
+func Detect(data []byte) (string, bool, error) {
+	f, known, err := detect(data)
+	if f == nil {
+		return "", known, err
+	}
+	return f.name, known, err
+}
+
 // Probe sniffs a file's format by magic bytes and reads its dimensions.
 // It never fails: unrecognizable or unsupported sources come back with a
 // SkipReason so the page can show the row as "skipped" — including the
