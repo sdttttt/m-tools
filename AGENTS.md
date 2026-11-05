@@ -80,6 +80,7 @@ m-tools/
 │   ├── icon.png
 │   └── bin/              # with_ffmpeg 构建时捆绑的 ffmpeg（gitignore，留 README）
 ├── build/                # mygo build 产物（gitignore）
+├── README.md             # 面向使用者的简介（功能 / 安装 / 开发 / 许可）
 ├── LICENSE               # 0BSD：只覆盖本仓库原创代码
 ├── THIRD-PARTY-NOTICES.md # 分发产物内第三方组件的许可与版权声明
 ├── .agents/skills/mygo-maintenance/  # MyGo 维护 skill（脚手架自带）
