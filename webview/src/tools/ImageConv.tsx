@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { ImageConv, type ImgconvConvertResult, type Info as ImageInfo } from "~/mygo";
-import { Button } from "~/components/ui/button";
+import { MotionButton } from "~/components/motion";
 import { Card, CardContent } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
 import { InfoTip } from "~/components/InfoTip";
@@ -251,16 +251,16 @@ export default function ImageConvTool() {
                           {STATE_LABELS[r.state]}
                         </span>
                         <Show when={r.state === "done" && r.result}>
-                          <Button variant="outline" size="sm" onClick={() => save(r)}>
+                          <MotionButton variant="outline" size="sm" onClick={() => save(r)}>
                             保存到…
-                          </Button>
-                          <Button
+                          </MotionButton>
+                          <MotionButton
                             variant="outline"
                             size="sm"
                             onClick={() => ImageConv.openFolder(r.result!.outputPath)}
                           >
                             打开文件夹
-                          </Button>
+                          </MotionButton>
                         </Show>
                       </div>
                     </div>
@@ -281,7 +281,7 @@ export default function ImageConvTool() {
               <Show
                 when={!running()}
                 fallback={
-                  <Button
+                  <MotionButton
                     variant="outline"
                     onClick={() => {
                       stopRequested = true;
@@ -289,12 +289,12 @@ export default function ImageConvTool() {
                     }}
                   >
                     取消
-                  </Button>
+                  </MotionButton>
                 }
               >
-                <Button onClick={run} disabled={!hasPending()}>
+                <MotionButton onClick={run} disabled={!hasPending()}>
                   开始转换
-                </Button>
+                </MotionButton>
               </Show>
               <Show when={notice()}>
                 <span class="truncate text-sm text-muted-foreground">{notice()}</span>

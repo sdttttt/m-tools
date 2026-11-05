@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { ImageResize, type Info as ImageInfo, type ResizeResult } from "~/mygo";
-import { Button } from "~/components/ui/button";
+import { MotionButton } from "~/components/motion";
 import { Card, CardContent } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
 import { InfoTip } from "~/components/InfoTip";
@@ -360,16 +360,16 @@ export default function ImageResizeTool() {
                           {STATE_LABELS[r.state]}
                         </span>
                         <Show when={r.state === "done" && r.result}>
-                          <Button variant="outline" size="sm" onClick={() => save(r)}>
+                          <MotionButton variant="outline" size="sm" onClick={() => save(r)}>
                             保存到…
-                          </Button>
-                          <Button
+                          </MotionButton>
+                          <MotionButton
                             variant="outline"
                             size="sm"
                             onClick={() => ImageResize.openFolder(r.result!.outputPath)}
                           >
                             打开文件夹
-                          </Button>
+                          </MotionButton>
                         </Show>
                       </div>
                     </div>
@@ -390,7 +390,7 @@ export default function ImageResizeTool() {
               <Show
                 when={!running()}
                 fallback={
-                  <Button
+                  <MotionButton
                     variant="outline"
                     onClick={() => {
                       stopRequested = true;
@@ -398,12 +398,12 @@ export default function ImageResizeTool() {
                     }}
                   >
                     取消
-                  </Button>
+                  </MotionButton>
                 }
               >
-                <Button onClick={run} disabled={!hasPending()}>
+                <MotionButton onClick={run} disabled={!hasPending()}>
                   开始调整
-                </Button>
+                </MotionButton>
               </Show>
               <Show when={notice()}>
                 <span class="truncate text-sm text-muted-foreground">{notice()}</span>

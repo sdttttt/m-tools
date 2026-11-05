@@ -1,8 +1,8 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import { System } from "~/mygo";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "~/components/ui/card";
 import { ThemeToggle } from "~/components/ThemeToggle";
+import { ENTER, ENTER_VIEW, FadeSwap, MotionButton } from "~/components/motion";
 import Mp4GifTool from "~/tools/Mp4Gif";
 import ImageConvTool from "~/tools/ImageConv";
 import ImageResizeTool from "~/tools/ImageResize";
@@ -40,9 +40,9 @@ export default function App() {
           <Show when={tool()} fallback={<h1 class="m-0 text-xl font-semibold">M-Tools</h1>}>
             {(t) => (
               <>
-                <Button variant="outline" size="sm" onClick={() => setTool(null)}>
+                <MotionButton variant="outline" size="sm" onClick={() => setTool(null)}>
                   ← 返回
-                </Button>
+                </MotionButton>
                 <h1 class="m-0 text-xl font-semibold">{TOOLS.find((x) => x.id === t())?.name}</h1>
               </>
             )}
@@ -55,11 +55,12 @@ export default function App() {
         <Show
           when={tool()}
           fallback={
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+            <div class={`grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 ${ENTER_VIEW}`}>
               <For each={TOOLS}>
-                {(t) => (
+                {(t, i) => (
                   <Card
-                    class="cursor-pointer transition-colors hover:border-primary"
+                    class={`cursor-pointer transition-all duration-200 ease-out hover:border-primary hover:shadow-md ${ENTER}`}
+                    style={{ "animation-delay": `${i() * 40}ms` }}
                     onClick={() => setTool(t.id)}
                   >
                     <CardContent class="p-4">
@@ -72,10 +73,12 @@ export default function App() {
             </div>
           }
         >
-          {tool() === "mp4gif" && <Mp4GifTool />}
-          {tool() === "imgconv" && <ImageConvTool />}
-          {tool() === "imgresize" && <ImageResizeTool />}
-          {tool() === "imgoptimize" && <ImageOptimizeTool />}
+          <FadeSwap when={tool()}>
+            {tool() === "mp4gif" && <Mp4GifTool />}
+            {tool() === "imgconv" && <ImageConvTool />}
+            {tool() === "imgresize" && <ImageResizeTool />}
+            {tool() === "imgoptimize" && <ImageOptimizeTool />}
+          </FadeSwap>
         </Show>
       </main>
       <footer class="px-8 py-3 text-xs">

@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
 import { Mp4Gif, events, type ConvertResult, type PreviewResult, type VideoInfo } from "~/mygo";
-import { Button } from "~/components/ui/button";
+import { MotionButton } from "~/components/motion";
 import { Card, CardContent } from "~/components/ui/card";
 import { MIN_TRIM_SPAN, TrimTimeline } from "~/components/TrimTimeline";
 import { Label } from "~/components/ui/label";
@@ -306,28 +306,28 @@ export default function Mp4GifTool() {
           when={converting()}
           fallback={
             <>
-              <Button onClick={convert} disabled={!info() || previewing()}>
+              <MotionButton onClick={convert} disabled={!info() || previewing()}>
                 开始转换
-              </Button>
+              </MotionButton>
               <Show
                 when={previewing()}
                 fallback={
-                  <Button variant="outline" onClick={previewClip} disabled={!info()}>
+                  <MotionButton variant="outline" onClick={previewClip} disabled={!info()}>
                     预览片段
-                  </Button>
+                  </MotionButton>
                 }
               >
-                <Button variant="outline" onClick={() => Mp4Gif.cancelActive()}>
+                <MotionButton variant="outline" onClick={() => Mp4Gif.cancelActive()}>
                   取消预览
-                </Button>
+                </MotionButton>
                 <span class="text-sm text-muted-foreground">生成预览…</span>
               </Show>
             </>
           }
         >
-          <Button variant="outline" onClick={() => Mp4Gif.cancelActive()}>
+          <MotionButton variant="outline" onClick={() => Mp4Gif.cancelActive()}>
             取消
-          </Button>
+          </MotionButton>
           <span class="text-sm text-muted-foreground">
             {STAGE_LABELS[progress().stage] ?? "准备中"} · {percent()}%
           </span>
@@ -352,11 +352,11 @@ export default function Mp4GifTool() {
                 {(r().durationMs / 1000).toFixed(1)} 秒
               </p>
               <div class="flex items-center gap-3">
-                <Button onClick={save}>保存到…</Button>
+                <MotionButton onClick={save}>保存到…</MotionButton>
                 <Show when={savedPath()}>
-                  <Button variant="outline" onClick={() => Mp4Gif.openFolder(savedPath())}>
+                  <MotionButton variant="outline" onClick={() => Mp4Gif.openFolder(savedPath())}>
                     打开文件夹
-                  </Button>
+                  </MotionButton>
                   <span class="truncate text-xs text-muted-foreground">{savedPath()}</span>
                 </Show>
               </div>

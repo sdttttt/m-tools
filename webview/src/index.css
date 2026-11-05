@@ -86,4 +86,15 @@
       "rlig" 1,
       "calt" 1;
   }
+  /* Belt-and-suspenders for reduced motion: components already gate their
+     animations behind motion-safe:, this kills anything that slips in. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

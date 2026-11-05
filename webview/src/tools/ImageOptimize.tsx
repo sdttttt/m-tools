@@ -1,6 +1,6 @@
 import { createSignal, For, Show } from "solid-js";
 import { ImageOptimize, type Info as ImageInfo, type OptimizeResult } from "~/mygo";
-import { Button } from "~/components/ui/button";
+import { MotionButton } from "~/components/motion";
 import { Card, CardContent } from "~/components/ui/card";
 import { InfoTip } from "~/components/InfoTip";
 import { STATE_COLORS, STATE_LABELS, fmtSize, fileName, probeAll, type RowState } from "~/lib/img";
@@ -160,16 +160,16 @@ export default function ImageOptimizeTool() {
                   <div class="flex shrink-0 items-center gap-2">
                     <span class={`text-xs ${STATE_COLORS[r.state]}`}>{STATE_LABELS[r.state]}</span>
                     <Show when={r.state === "done" && r.result?.outputPath}>
-                      <Button variant="outline" size="sm" onClick={() => save(r)}>
+                      <MotionButton variant="outline" size="sm" onClick={() => save(r)}>
                         保存到…
-                      </Button>
-                      <Button
+                      </MotionButton>
+                      <MotionButton
                         variant="outline"
                         size="sm"
                         onClick={() => ImageOptimize.openFolder(r.result!.outputPath)}
                       >
                         打开文件夹
-                      </Button>
+                      </MotionButton>
                     </Show>
                   </div>
                 </div>
@@ -181,7 +181,7 @@ export default function ImageOptimizeTool() {
               <Show
                 when={!running()}
                 fallback={
-                  <Button
+                  <MotionButton
                     variant="outline"
                     onClick={() => {
                       stopRequested = true;
@@ -189,12 +189,12 @@ export default function ImageOptimizeTool() {
                     }}
                   >
                     取消
-                  </Button>
+                  </MotionButton>
                 }
               >
-                <Button onClick={run} disabled={!hasPending()}>
+                <MotionButton onClick={run} disabled={!hasPending()}>
                   开始优化
-                </Button>
+                </MotionButton>
               </Show>
               <Show when={notice()}>
                 <span class="truncate text-sm text-muted-foreground">{notice()}</span>
