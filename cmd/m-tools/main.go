@@ -161,6 +161,34 @@ func (s *Mp4Gif) Probe(ctx context.Context, path string) (ffmpeg.VideoInfo, erro
 	return client.Probe(ctx, path)
 }
 
+// Thumbnail geometry for the trim timeline's filmstrip.
+const (
+	thumbnailCount = 12
+	thumbnailWidth = 160
+)
+
+// Thumbnails returns evenly spaced stills of the video as JPEG data URLs,
+// for the trim timeline's filmstrip.
+func (s *Mp4Gif) Thumbnails(ctx context.Context, path string) ([]string, error) {
+	client, err := s.tools()
+	if err != nil {
+		return nil, err
+	}
+	info, err := client.Probe(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	thumbs, err := client.Thumbnails(ctx, path, thumbnailCount, thumbnailWidth, info.DurationSec)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(thumbs))
+	for i, data := range thumbs {
+		out[i] = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(data)
+	}
+	return out, nil
+}
+
 // SuggestOutput returns a default GIF path next to the input file.
 func (s *Mp4Gif) SuggestOutput(input string) string {
 	ext := filepath.Ext(input)

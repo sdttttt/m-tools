@@ -122,6 +122,13 @@ export const Mp4Gif = {
   suggestOutput(input: string): Promise<string> {
     return call("Mp4Gif.SuggestOutput", input);
   },
+  /**
+   * Thumbnails returns evenly spaced stills of the video as JPEG data URLs,
+   * for the trim timeline's filmstrip.
+   */
+  thumbnails(path: string): Promise<string[]> {
+    return call("Mp4Gif.Thumbnails", path);
+  },
 } as const;
 
 // ---- Events ----

@@ -62,6 +62,7 @@ m-tools/
 │       ├── tools/        # 各工具页面（每个工具一个文件，如 Mp4Gif.tsx）
 │       ├── components/ui/ # solid-ui 组件（从 registry 复制，勿手写样式进这里）
 │       ├── components/ThemeToggle.tsx
+│       ├── components/TrimTimeline.tsx # 胶片时间轴（双拖拽手柄 + 键盘微调）
 │       ├── lib/theme.ts  # 主题唯一来源（light|dark|system，持久化 + 窗口同步）
 │       ├── lib/utils.ts  # cn()
 │       ├── index.css     # 唯一 CSS：@tailwind 指令 + HSL token + body 基础
@@ -138,13 +139,15 @@ m-tools/
   - `ffmpeg.New() (*Client, error)` —— 解析工具并返回客户端
   - `client.Probe(ctx, path) (VideoInfo, error)` —— 元数据
   - `client.ConvertGIF(ctx, GIFRequest, onProgress) (GIFResult, error)` —— 转换 + 输出校验；请求里传 `SourceFPS`/`SourceWidth`，上限收敛在模块内做
+  - `client.Thumbnails(ctx, input, count, width, durationSec) ([][]byte, error)` —— 时间轴胶片缩略图（JPEG，按全片均匀采样）
   - `ffmpeg.UseBundledDir(func() (dir, error))` —— with_ffmpeg 构建的注入点（main 包 init 里注册）
   - `ffmpeg.EnvDir`（`MTOOLS_FFMPEG_DIR`）—— 开发/测试用环境变量覆盖
 - 查找顺序：`$MTOOLS_FFMPEG_DIR` → `with_ffmpeg` 构建内嵌包（解压到用户缓存目录）→ 可执行文件旁的 `bin/` → PATH。
 - **构建变体**：`go build`（默认，依赖系统/环境 PATH 的 ffmpeg）；`go build -tags with_ffmpeg`（捆绑 `resources/bin/` 下的 ffmpeg/ffprobe 进单二进制，运行时首次解压）。
 - 转换策略：两遍 palettegen/paletteuse（GIF 质量关键），FPS/宽度不超过源视频；进度经 `-progress pipe:1` 解析后通过 `mp4gifProgress` 事件推给前端（palette 占 30% / encode 占 70%）。
+- 截取范围：前端 `components/TrimTimeline.tsx` 是胶片时间轴（拖起点/终点手柄，拖选中段整体平移，方向键 ±0.1s、Shift ±1s），起点/终点数值输入框与之同步；缩略图经 `Mp4Gif.Thumbnails`（12 帧、160px 宽、data URL）加载，失败时退化为纯色轨道仍可拖拽。
 - mygo 服务包装（Bind/事件/对话框/取消/预览/保存）在 `cmd/m-tools/main.go`；一次只跑一个转换任务（`CancelActive`）。
-- 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验），无 ffmpeg 时自动 skip。
+- 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
 
 ## 版本与构建
 

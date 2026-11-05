@@ -2,6 +2,7 @@ import { createSignal, onCleanup, Show } from "solid-js";
 import { Mp4Gif, events, type ConvertResult, type VideoInfo } from "~/mygo";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { MIN_TRIM_SPAN, TrimTimeline } from "~/components/TrimTimeline";
 import { Label } from "~/components/ui/label";
 import { Progress } from "~/components/ui/progress";
 import {
@@ -49,8 +50,10 @@ function fmtSec(n: number): string {
 export default function Mp4GifTool() {
   const [videoPath, setVideoPath] = createSignal("");
   const [info, setInfo] = createSignal<VideoInfo | null>(null);
-  const [startSec, setStartSec] = createSignal("");
-  const [durationSec, setDurationSec] = createSignal("");
+  const [trimStart, setTrimStart] = createSignal(0);
+  const [trimEnd, setTrimEnd] = createSignal(0);
+  const [thumbs, setThumbs] = createSignal<string[]>([]);
+  const [thumbLoading, setThumbLoading] = createSignal(false);
   const [fps, setFps] = createSignal(15);
   const [maxWidth, setMaxWidth] = createSignal(480);
   const [quality, setQuality] = createSignal<Quality>("balanced");
@@ -68,6 +71,18 @@ export default function Mp4GifTool() {
   const suggestedName = () => videoPath().replace(/\.[^.]+$/, "") + ".gif";
   const converting = () => phase() === "converting";
   const percent = () => Math.round(progress().percent);
+  const clipDuration = () => info()?.durationSec ?? 0;
+  const secondsInput = (v: number) => String(Number(v.toFixed(1)));
+
+  function setStart(value: number) {
+    setTrimStart(Math.min(Math.max(0, value), Math.max(0, trimEnd() - MIN_TRIM_SPAN)));
+  }
+
+  function setEnd(value: number) {
+    const min = trimStart() + MIN_TRIM_SPAN;
+    const max = clipDuration() > 0 ? clipDuration() : Math.max(min, value);
+    setTrimEnd(Math.min(Math.max(min, value), max));
+  }
 
   async function pick() {
     const p = await Mp4Gif.pickVideo();
@@ -77,12 +92,25 @@ export default function Mp4GifTool() {
     setError("");
     setSavedPath("");
     setInfo(null);
+    setThumbs([]);
+    setTrimStart(0);
+    setTrimEnd(0);
     setVideoPath(p);
     try {
       const v = await Mp4Gif.probe(p);
       setInfo(v);
+      setTrimEnd(v.durationSec);
       setFps(Math.max(5, Math.min(15, Math.floor(v.fps) || 15)));
       setMaxWidth(Math.min(480, Math.max(100, v.width)));
+      setThumbLoading(true);
+      Mp4Gif.thumbnails(p)
+        .then((frames) => {
+          if (videoPath() === p) setThumbs(frames);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (videoPath() === p) setThumbLoading(false);
+        });
     } catch (e) {
       setError(String(e));
       setPhase("error");
@@ -96,8 +124,8 @@ export default function Mp4GifTool() {
     try {
       const res = await Mp4Gif.convert({
         path: videoPath(),
-        startSec: parseFloat(startSec()) || 0,
-        durationSec: parseFloat(durationSec()) || 0,
+        startSec: trimStart(),
+        durationSec: Math.max(0, trimEnd() - trimStart()),
         fps: fps(),
         maxWidth: maxWidth(),
         quality: quality(),
@@ -139,54 +167,74 @@ export default function Mp4GifTool() {
       {/* 参数 */}
       <Show when={info()}>
         <Card>
-          <CardContent class="flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4">
-            <div class="flex flex-col gap-1">
-              <Label class="text-xs text-muted-foreground">起始秒</Label>
-              <TextField value={startSec()} onChange={(value: string) => setStartSec(value)}>
-                <TextFieldInput class="w-24" placeholder="从头" />
-              </TextField>
-            </div>
-            <div class="flex flex-col gap-1">
-              <Label class="text-xs text-muted-foreground">时长秒</Label>
-              <TextField value={durationSec()} onChange={(value: string) => setDurationSec(value)}>
-                <TextFieldInput class="w-24" placeholder="到结尾" />
-              </TextField>
-            </div>
-            <div class="flex flex-col gap-1">
-              <Label class="text-xs text-muted-foreground">帧率</Label>
-              <TextField
-                value={String(fps())}
-                onChange={(value: string) => setFps(parseInt(value) || 15)}
-              >
-                <TextFieldInput class="w-24" type="number" min={5} max={30} />
-              </TextField>
-            </div>
-            <div class="flex flex-col gap-1">
-              <Label class="text-xs text-muted-foreground">最大宽度</Label>
-              <TextField
-                value={String(maxWidth())}
-                onChange={(value: string) => setMaxWidth(parseInt(value) || 480)}
-              >
-                <TextFieldInput class="w-24" type="number" min={100} max={1920} />
-              </TextField>
-            </div>
-            <div class="flex flex-col gap-1">
-              <Label class="text-xs text-muted-foreground">画质</Label>
-              <Select
-                options={[...QUALITY_LABELS]}
-                value={LABEL_BY_QUALITY[quality()]}
-                onChange={(label) => {
-                  if (label) setQuality(QUALITY_BY_LABEL[label] ?? "balanced");
-                }}
-                itemComponent={(props) => (
-                  <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
-                )}
-              >
-                <SelectTrigger class="w-40" aria-label="画质">
-                  <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
-                </SelectTrigger>
-                <SelectContent />
-              </Select>
+          <CardContent class="flex flex-col gap-4 px-5 py-4">
+            <TrimTimeline
+              frames={thumbs()}
+              duration={clipDuration()}
+              start={trimStart()}
+              end={trimEnd()}
+              loading={thumbLoading()}
+              disabled={converting()}
+              onChange={(start, end) => {
+                setTrimStart(start);
+                setTrimEnd(end);
+              }}
+            />
+            <div class="flex flex-wrap items-end gap-x-6 gap-y-3">
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">起点秒</Label>
+                <TextField
+                  value={secondsInput(trimStart())}
+                  onChange={(value: string) => setStart(parseFloat(value) || 0)}
+                >
+                  <TextFieldInput class="w-24" type="number" min={0} step={0.1} />
+                </TextField>
+              </div>
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">终点秒</Label>
+                <TextField
+                  value={secondsInput(trimEnd())}
+                  onChange={(value: string) => setEnd(parseFloat(value) || 0)}
+                >
+                  <TextFieldInput class="w-24" type="number" min={0} step={0.1} />
+                </TextField>
+              </div>
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">帧率</Label>
+                <TextField
+                  value={String(fps())}
+                  onChange={(value: string) => setFps(parseInt(value) || 15)}
+                >
+                  <TextFieldInput class="w-24" type="number" min={5} max={30} />
+                </TextField>
+              </div>
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">最大宽度</Label>
+                <TextField
+                  value={String(maxWidth())}
+                  onChange={(value: string) => setMaxWidth(parseInt(value) || 480)}
+                >
+                  <TextFieldInput class="w-24" type="number" min={100} max={1920} />
+                </TextField>
+              </div>
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">画质</Label>
+                <Select
+                  options={[...QUALITY_LABELS]}
+                  value={LABEL_BY_QUALITY[quality()]}
+                  onChange={(label) => {
+                    if (label) setQuality(QUALITY_BY_LABEL[label] ?? "balanced");
+                  }}
+                  itemComponent={(props) => (
+                    <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
+                  )}
+                >
+                  <SelectTrigger class="w-40" aria-label="画质">
+                    <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
