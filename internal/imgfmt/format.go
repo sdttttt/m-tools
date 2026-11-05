@@ -1,4 +1,4 @@
-package imgconv
+package imgfmt
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ import (
 
 // format is one convertible image format: how to read and write it. decode
 // returns the first frame for animations; encode receives the decoded,
-// already scaled/flattened image. useQuality says whether the quality
+// already resized/flattened image. useQuality says whether the quality
 // choice means anything for this target.
 type format struct {
 	name       string
@@ -27,10 +27,9 @@ type format struct {
 	useQuality bool
 }
 
-// encodeGIF adapts the stdlib gif encoder's signature; nil options use the
-// default 256-color quantization for photographic sources.
-func encodeGIF(w *bytes.Buffer, m image.Image, _ int) error {
-	return gif.Encode(w, m, nil)
+// encodeJPEG adapts the stdlib jpeg encoder's signature.
+func encodeJPEG(w *bytes.Buffer, m image.Image, quality int) error {
+	return jpeg.Encode(w, m, &jpeg.Options{Quality: quality})
 }
 
 // encodePNG adapts the stdlib png encoder's signature.
@@ -38,9 +37,10 @@ func encodePNG(w *bytes.Buffer, m image.Image, _ int) error {
 	return png.Encode(w, m)
 }
 
-// encodeJPEG adapts the stdlib jpeg encoder's signature.
-func encodeJPEG(w *bytes.Buffer, m image.Image, quality int) error {
-	return jpeg.Encode(w, m, &jpeg.Options{Quality: quality})
+// encodeGIF adapts the stdlib gif encoder's signature; nil options use the
+// default 256-color quantization for photographic sources.
+func encodeGIF(w *bytes.Buffer, m image.Image, _ int) error {
+	return gif.Encode(w, m, nil)
 }
 
 // encodeBMP and encodeTIFF adapt the x/image encoders' signatures.
@@ -48,9 +48,9 @@ func encodeBMP(w *bytes.Buffer, m image.Image, _ int) error { return bmp.Encode(
 
 func encodeTIFF(w *bytes.Buffer, m image.Image, _ int) error { return tiff.Encode(w, m, nil) }
 
-// formats is the conversion target table. gif/png/bmp/tiff are lossless
-// targets (quality ignored); webp arrives through the webp module, which is
-// only functional on with_webp builds — see webpFormat below.
+// formats is the format table. gif/png/bmp/tiff are lossless targets
+// (quality ignored); webp arrives through the webp module, which is only
+// functional on with_webp builds — see webpFormat below.
 var formats = map[string]*format{
 	"jpg": {
 		name: "jpg", ext: ".jpg", magic: "\xff\xd8\xff",
@@ -79,15 +79,39 @@ var formats = map[string]*format{
 // constant covers both VP8 (lossy) and VP8L/VP8X (lossless/extended)
 // because the check only looks at the RIFF container header.
 func webpFormat() (*format, bool) {
-	if !webpSupported() {
+	if !Supported() {
 		return nil, false
 	}
 	return &format{
-		name: "webp", ext: ".webp", magic: "RIFF????WEBP",
+		name: "webp", ext: ".webp", magic: webpMagic,
 		decode: webp.Decode,
 		encode: func(w *bytes.Buffer, m image.Image, quality int) error {
 			return webp.Encode(w, m, quality)
 		},
 		useQuality: true,
 	}, true
+}
+
+// TargetNames lists every format id the services can convert to. WebP is
+// included only on with_webp builds; the page builds its target dropdown
+// from this.
+func TargetNames() []string {
+	names := make([]string, 0, len(formats)+1)
+	for name := range formats {
+		names = append(names, name)
+	}
+	if f, ok := webpFormat(); ok {
+		names = append(names, f.name)
+	}
+	return names
+}
+
+// HasTarget reports whether id is a usable target format in this build.
+func HasTarget(id string) bool {
+	if id == "webp" {
+		_, ok := webpFormat()
+		return ok
+	}
+	_, ok := formats[id]
+	return ok
 }

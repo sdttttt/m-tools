@@ -1,4 +1,4 @@
-package imgconv
+package imgfmt
 
 import (
 	"bytes"
@@ -11,9 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/sdttttt/m-tools/webp"
 )
 
-// solid returns a 8x8 NRGBA filled with one color.
+// solid returns an 8x8 NRGBA filled with one color.
 func solid(c color.Color) *image.NRGBA {
 	m := image.NewNRGBA(image.Rect(0, 0, 8, 8))
 	for y := 0; y < 8; y++ {
@@ -78,15 +80,39 @@ func writeTestAnimatedGIF(t *testing.T, dir, name string, frames ...color.RGBA) 
 	return p
 }
 
+// testWebPBytes produces webp bytes for probe tests: a real encode on
+// with_webp builds, a bare RIFF/WEBP container header otherwise (the stub
+// path reports the missing codec before any decode is attempted).
+func testWebPBytes(t *testing.T) []byte {
+	t.Helper()
+	if webp.Supported() {
+		var buf bytes.Buffer
+		if err := webp.Encode(&buf, solid(color.RGBA{B: 255, A: 255}), 90); err != nil {
+			t.Fatalf("webp.Encode: %v", err)
+		}
+		return buf.Bytes()
+	}
+	hdr := make([]byte, 32)
+	copy(hdr, "RIFF")
+	putLE32(hdr[4:], 24)
+	copy(hdr[8:], "WEBP")
+	copy(hdr[12:], "VP8 ")
+	putLE32(hdr[16:], 16)
+	return hdr
+}
+
+func putLE32(b []byte, v uint32) {
+	b[0] = byte(v)
+	b[1] = byte(v >> 8)
+	b[2] = byte(v >> 16)
+	b[3] = byte(v >> 24)
+}
+
 func TestProbeFormats(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
 
 	pngPath := writeTestPNG(t, dir, "a.png", color.RGBA{R: 255, A: 255})
-	info, err := s.Probe(pngPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	info := Probe(pngPath)
 	if info.Format != "png" || !info.Supported || info.Width != 8 || info.Height != 8 {
 		t.Fatalf("png probe = %+v", info)
 	}
@@ -94,20 +120,12 @@ func TestProbeFormats(t *testing.T) {
 		t.Fatal("opaque png reported HasAlpha")
 	}
 
-	jpgPath := writeTestJPEG(t, dir, "b.jpg")
-	info, err = s.Probe(jpgPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	info = Probe(writeTestJPEG(t, dir, "b.jpg"))
 	if info.Format != "jpg" || !info.Supported || info.HasAlpha {
 		t.Fatalf("jpg probe = %+v", info)
 	}
 
-	gifPath := writeTestAnimatedGIF(t, dir, "c.gif", color.RGBA{R: 255, A: 255}, color.RGBA{B: 255, A: 255})
-	info, err = s.Probe(gifPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	info = Probe(writeTestAnimatedGIF(t, dir, "c.gif", color.RGBA{R: 255, A: 255}, color.RGBA{B: 255, A: 255}))
 	if info.Format != "gif" || !info.Supported {
 		t.Fatalf("gif probe = %+v", info)
 	}
@@ -117,11 +135,8 @@ func TestProbeFormats(t *testing.T) {
 	if err := os.WriteFile(webpPath, testWebPBytes(t), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	info, err = s.Probe(webpPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if webpSupported() {
+	info = Probe(webpPath)
+	if webp.Supported() {
 		if info.Format != "webp" || !info.Supported {
 			t.Fatalf("webp probe = %+v", info)
 		}
@@ -129,7 +144,7 @@ func TestProbeFormats(t *testing.T) {
 		if info.Supported {
 			t.Fatal("stub build reported webp as supported")
 		}
-		if info.SkipReason != errWebpUnsupported.Error() {
+		if info.SkipReason != ErrUnsupported.Error() {
 			t.Fatalf("webp skip reason = %q", info.SkipReason)
 		}
 	}
@@ -139,25 +154,21 @@ func TestProbeFormats(t *testing.T) {
 	if err := os.WriteFile(junk, []byte("not an image at all"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	info, err = s.Probe(junk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	info = Probe(junk)
 	if info.Supported || info.SkipReason == "" {
 		t.Fatalf("junk probe = %+v", info)
 	}
 }
 
-func TestConvertMatrix(t *testing.T) {
+func TestPipelineMatrix(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
 	ctx := context.Background()
 
 	src := writeTestPNG(t, dir, "img.png", color.RGBA{R: 255, G: 0, B: 0, A: 255})
 
-	// Every target round-trips the source size.
+	// Every target round-trips the source size (no resize axes given).
 	for _, target := range []string{"jpg", "png", "gif", "bmp", "tiff"} {
-		res, err := s.Convert(ctx, ConvertRequest{
+		res, err := Run(ctx, Spec{
 			Path: src, TargetFormat: target, Quality: "high",
 		})
 		if err != nil {
@@ -169,20 +180,20 @@ func TestConvertMatrix(t *testing.T) {
 		if res.SizeBytes == 0 || res.OutputPath == "" {
 			t.Fatalf("png→%s result = %+v", target, res)
 		}
-		if _, err := os.Stat(res.OutputPath); err != nil {
-			t.Fatalf("png→%s output missing: %v", target, err)
+		if res.PNGBytes == nil {
+			t.Fatalf("png→%s preview bytes missing", target)
 		}
 		os.Remove(res.OutputPath)
 	}
 
 	// Unknown target.
-	if _, err := s.Convert(ctx, ConvertRequest{Path: src, TargetFormat: "heic"}); err == nil {
+	if _, err := Run(ctx, Spec{Path: src, TargetFormat: "heic"}); err == nil {
 		t.Fatal("unknown target accepted")
 	}
 
 	// JPEG source to png (decode via table, re-encode lossless).
 	jpg := writeTestJPEG(t, dir, "photo.jpg")
-	res, err := s.Convert(ctx, ConvertRequest{Path: jpg, TargetFormat: "png"})
+	res, err := Run(ctx, Spec{Path: jpg, TargetFormat: "png"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,9 +202,8 @@ func TestConvertMatrix(t *testing.T) {
 	}
 }
 
-func TestConvertAlphaFlattenedForJPEG(t *testing.T) {
+func TestPipelineAlphaFlattenedForJPEG(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
 
 	// RGBA source: top-left opaque red, rest fully transparent.
 	m := solid(color.NRGBA{A: 0})
@@ -202,15 +212,12 @@ func TestConvertAlphaFlattenedForJPEG(t *testing.T) {
 		return png.Encode(f, img)
 	})
 
-	info, err := s.Probe(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+	info := Probe(p)
 	if !info.HasAlpha {
 		t.Fatal("transparent png not flagged HasAlpha")
 	}
 
-	res, err := s.Convert(context.Background(), ConvertRequest{Path: p, TargetFormat: "jpg"})
+	res, err := Run(context.Background(), Spec{Path: p, TargetFormat: "jpg"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,20 +236,18 @@ func TestConvertAlphaFlattenedForJPEG(t *testing.T) {
 	}
 }
 
-func TestConvertAnimatedGIFTakesFirstFrame(t *testing.T) {
+func TestPipelineAnimatedGIFTakesFirstFrame(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
 	gifPath := writeTestAnimatedGIF(t, dir, "anim.gif",
 		color.RGBA{R: 255, A: 255}, color.RGBA{B: 255, A: 255})
 
-	res, err := s.Convert(context.Background(), ConvertRequest{Path: gifPath, TargetFormat: "png"})
+	res, err := Run(context.Background(), Spec{Path: gifPath, TargetFormat: "png"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Width != 8 || res.Height != 8 {
 		t.Fatalf("anim→png size = %dx%d", res.Width, res.Height)
 	}
-	// Exactly one frame of output (the png holds the first frame's color).
 	data, err := os.ReadFile(res.OutputPath)
 	if err != nil {
 		t.Fatal(err)
@@ -257,26 +262,63 @@ func TestConvertAnimatedGIFTakesFirstFrame(t *testing.T) {
 	}
 }
 
-func TestConvertScalesDownOnly(t *testing.T) {
+func TestResizeUpAndDown(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
-	ctx := context.Background()
 	src := writeTestPNG(t, dir, "big.png", color.RGBA{G: 255, A: 255})
+	ctx := context.Background()
 
-	res, err := s.Convert(ctx, ConvertRequest{Path: src, TargetFormat: "png", MaxWidth: 4})
+	// Downscale to an exact size.
+	res, err := Run(ctx, Spec{Path: src, TargetFormat: "png", Width: 4, Height: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Width != 4 || res.Height != 4 {
-		t.Fatalf("scaled size = %dx%d, want 4x4", res.Width, res.Height)
+		t.Fatalf("downscale size = %dx%d, want 4x4", res.Width, res.Height)
 	}
 
-	res, err = s.Convert(ctx, ConvertRequest{Path: src, TargetFormat: "png", MaxWidth: 64})
+	// Upscale is allowed by the shared pipeline (the resize tool decides).
+	res, err = Run(ctx, Spec{Path: src, TargetFormat: "png", Width: 16, Height: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Width != 8 {
-		t.Fatalf("upscaled to %d, want 8", res.Width)
+	if res.Width != 16 || res.Height != 16 {
+		t.Fatalf("upscale size = %dx%d, want 16x16", res.Width, res.Height)
+	}
+
+	// Zero axes keep the source size.
+	res, err = Run(ctx, Spec{Path: src, TargetFormat: "png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Width != 8 || res.Height != 8 {
+		t.Fatalf("keep-size = %dx%d, want 8x8", res.Width, res.Height)
+	}
+}
+
+func TestResizePartialAxes(t *testing.T) {
+	// Non-square source: 8x4. The pipeline itself does no aspect math —
+	// each zero axis just keeps the source size (the resize tool derives
+	// ratios before calling Run).
+	m := image.NewNRGBA(image.Rect(0, 0, 8, 4))
+	dir := t.TempDir()
+	src := encodeToFile(t, dir, "wide.png", m, func(f *os.File, img image.Image) error {
+		return png.Encode(f, img)
+	})
+
+	res, err := Run(context.Background(), Spec{Path: src, TargetFormat: "png", Width: 4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Width != 4 || res.Height != 4 {
+		t.Fatalf("width-only = %dx%d, want 4x4 (height kept)", res.Width, res.Height)
+	}
+
+	res, err = Run(context.Background(), Spec{Path: src, TargetFormat: "png", Height: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Width != 8 || res.Height != 8 {
+		t.Fatalf("height-only = %dx%d, want 8x8 (width kept)", res.Width, res.Height)
 	}
 }
 
@@ -286,54 +328,49 @@ func TestOutputNameClashSuffix(t *testing.T) {
 	if err := os.WriteFile(existing, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := outputFor(filepath.Join(dir, "img.png"), ".jpg")
+	got, err := OutputFor(filepath.Join(dir, "img.png"), ".jpg")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != filepath.Join(dir, "img-1.jpg") {
-		t.Fatalf("outputFor clash = %q", got)
+		t.Fatalf("OutputFor clash = %q", got)
 	}
 }
 
-func TestCancelActive(t *testing.T) {
+func TestCancelStopsPipeline(t *testing.T) {
 	dir := t.TempDir()
-	s := &Service{}
 	src := writeTestPNG(t, dir, "c.png", color.RGBA{R: 255, A: 255})
 
-	s.CancelActive() // no job running: must not panic
-
-	// A canceled context makes Convert bail before writing output.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := s.Convert(ctx, ConvertRequest{Path: src, TargetFormat: "png"}); err == nil {
-		t.Fatal("Convert succeeded with canceled context")
+	if _, err := Run(ctx, Spec{Path: src, TargetFormat: "png"}); err == nil {
+		t.Fatal("Run succeeded with canceled context")
 	}
 }
 
-func TestEncodeHelpersRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	src := writeTestPNG(t, dir, "rt.png", color.RGBA{R: 255, A: 255})
-	data, err := os.ReadFile(src)
-	if err != nil {
-		t.Fatal(err)
+func TestStubDecodeRejectsWebp(t *testing.T) {
+	if webp.Supported() {
+		t.Skip("webp codec compiled in; stub behavior not reachable")
 	}
-	m, err := png.Decode(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
+	if _, _, err := image.Decode(bytes.NewReader(testWebPBytes(t))); err == nil {
+		t.Fatal("image.Decode accepted webp bytes on a stub build")
 	}
-	var buf bytes.Buffer
-	if err := encodeGIF(&buf, m, 0); err != nil {
-		t.Fatal(err)
+}
+
+func TestTargetNamesIncludeWebpOnlyWhenSupported(t *testing.T) {
+	names := TargetNames()
+	has := false
+	for _, n := range names {
+		if n == "webp" {
+			has = true
+		}
 	}
-	if got, err := gif.Decode(bytes.NewReader(buf.Bytes())); err != nil || got.Bounds().Dx() != 8 {
-		t.Fatalf("gif round-trip: %v, %v", got, err)
+	if has != webp.Supported() {
+		t.Fatalf("TargetNames webp = %v, Supported = %v", has, webp.Supported())
 	}
-	buf.Reset()
-	if err := encodeBMP(&buf, m, 0); err != nil {
-		t.Fatal(err)
-	}
-	buf.Reset()
-	if err := encodeTIFF(&buf, m, 0); err != nil {
-		t.Fatal(err)
+	for _, n := range []string{"jpg", "png", "gif", "bmp", "tiff"} {
+		if !HasTarget(n) {
+			t.Fatalf("HasTarget(%q) = false", n)
+		}
 	}
 }

@@ -33,31 +33,15 @@ export interface GIFProgress {
 }
 
 /**
- * ImageInfo describes one picked image. HasAlpha flags sources that would
- * need flattening when the target is JPEG; Format is the canonical
- * lowercase extension-style id (png, jpg, gif, webp, bmp, tiff).
+ * ConvertRequest asks for one image format conversion. The output keeps
+ * the source pixel size — resizing lives in the ImageResize tool.
  */
-export interface ImageInfo {
-  path: string;
-  format: string;
-  width: number;
-  height: number;
-  sizeBytes: number;
-  hasAlpha: boolean;
-  /** decodable by this build */
-  supported: boolean;
-  skipReason: string;
-}
-
-/** ConvertRequest asks for one image format conversion. */
 export interface ImgconvConvertRequest {
   path: string;
   /** jpg | png | gif | webp | bmp | tiff */
   targetFormat: string;
   /** high | balanced | compact; JPEG/WebP only */
   quality: string;
-  /** 0 keeps the source size; only shrinks */
-  maxWidth: number;
 }
 
 /**
@@ -73,6 +57,25 @@ export interface ImgconvConvertResult {
   height: number;
   durationMs: number;
   previewDataURL: string;
+}
+
+/**
+ * Info describes one image file as the services report it to the page.
+ * HasAlpha flags sources that would need flattening when the target is
+ * JPEG; Format is the canonical lowercase extension-style id (png, jpg,
+ * gif, webp, bmp, tiff). Supported=false rows carry a SkipReason and the
+ * page shows them as skipped.
+ */
+export interface Info {
+  path: string;
+  format: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  hasAlpha: boolean;
+  /** decodable by this build */
+  supported: boolean;
+  skipReason: string;
 }
 
 /** PreviewRequest asks for a quick low-resolution preview of a clip range. */
@@ -96,6 +99,45 @@ export interface PreviewResult {
   durationSec: number;
   sizeBytes: number;
   durationMs: number;
+}
+
+/**
+ * ResizeRequest asks for one image size adjustment. Mode percent sizes by
+ * a percentage of the source (aspect always kept); mode exact uses the
+ * given width/height, where an empty axis is derived from the source ratio
+ * when Lock is set. TargetFormat doubles as the output format (may equal
+ * the source format for a pure resize).
+ */
+export interface ResizeRequest {
+  path: string;
+  /** jpg | png | gif | webp | bmp | tiff */
+  targetFormat: string;
+  /** high | balanced | compact; JPEG/WebP only */
+  quality: string;
+  /** percent | exact */
+  mode: string;
+  /** 1–400, percent mode */
+  percent: number;
+  /** exact mode; 0 = derive/keep */
+  width: number;
+  /** exact mode; 0 = derive/keep */
+  height: number;
+  /** derive the missing axis from the source ratio */
+  lock: boolean;
+}
+
+/**
+ * ResizeResult reports one finished resize. OutputPath sits next to the
+ * source file (-1 suffix on name clashes).
+ */
+export interface ResizeResult {
+  outputPath: string;
+  format: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  durationMs: number;
+  previewDataURL: string;
 }
 
 /** Stage names reported through GIFProgress.Stage. */
@@ -216,9 +258,10 @@ export const ImageConv = {
     return call("ImageConv.CancelActive");
   },
   /**
-   * Convert converts one image to the requested format and writes the result
-   * next to the source file. The page drives batches by calling this once
-   * per row; ctx cancellation (CancelActive) stops the current image.
+   * Convert converts one image to the requested format at its original size
+   * and writes the result next to the source file. The page drives batches
+   * by calling this once per row; ctx cancellation (CancelActive) stops the
+   * current image.
    */
   convert(req: ImgconvConvertRequest): Promise<ImgconvConvertResult> {
     return call("ImageConv.Convert", req);
@@ -234,8 +277,11 @@ export const ImageConv = {
   pickImages(): Promise<string[]> {
     return call("ImageConv.PickImages");
   },
-  /** Probe reads metadata of one picked image. */
-  probe(path: string): Promise<ImageInfo> {
+  /**
+   * Probe reads metadata of one picked image. It never errors: unsupported
+   * sources come back flagged so the page can show them as skipped rows.
+   */
+  probe(path: string): Promise<Info> {
     return call("ImageConv.Probe", path);
   },
   /**
@@ -247,11 +293,76 @@ export const ImageConv = {
   },
   /**
    * Supported reports whether WebP decode/encode is compiled into this build
-   * (with_webp tag). The page calls it once on mount to disable webp options
+   * (with_webp tag). The page calls it once on mount to hide webp options
    * with a hint instead of a runtime error.
    */
   supported(): Promise<boolean> {
     return call("ImageConv.Supported");
+  },
+  /**
+   * TargetNames lists every format the page can offer as a conversion
+   * target; WebP appears only on with_webp builds.
+   */
+  targetNames(): Promise<string[]> {
+    return call("ImageConv.TargetNames");
+  },
+} as const;
+
+/**
+ * Service is the image size adjustment tool. One job at a time, matching
+ * the other toolbox services.
+ */
+export const ImageResize = {
+  /** CancelActive stops the running resize, if any. */
+  cancelActive(): Promise<void> {
+    return call("ImageResize.CancelActive");
+  },
+  /** OpenFolder reveals the file's folder in the OS file manager. */
+  openFolder(path: string): Promise<void> {
+    return call("ImageResize.OpenFolder", path);
+  },
+  /**
+   * PickImages shows a native multi-select dialog and returns the chosen
+   * paths, or nil when canceled.
+   */
+  pickImages(): Promise<string[]> {
+    return call("ImageResize.PickImages");
+  },
+  /**
+   * Probe reads metadata of one picked image. It never errors: unsupported
+   * sources come back flagged so the page can show them as skipped rows.
+   */
+  probe(path: string): Promise<Info> {
+    return call("ImageResize.Probe", path);
+  },
+  /**
+   * Resize adjusts one image's size (and optionally its format) and writes
+   * the result next to the source file. ctx cancellation (CancelActive)
+   * stops the current image.
+   */
+  resize(req: ResizeRequest): Promise<ResizeResult> {
+    return call("ImageResize.Resize", req);
+  },
+  /**
+   * SaveAs shows a native save dialog and copies the resized image there.
+   * Returns the destination path, or "" when canceled.
+   */
+  saveAs(source: string, defaultName: string): Promise<string> {
+    return call("ImageResize.SaveAs", source, defaultName);
+  },
+  /**
+   * Supported reports whether WebP decode/encode is compiled into this build
+   * (with_webp tag).
+   */
+  supported(): Promise<boolean> {
+    return call("ImageResize.Supported");
+  },
+  /**
+   * TargetNames lists every format the page can offer as an output format;
+   * WebP appears only on with_webp builds.
+   */
+  targetNames(): Promise<string[]> {
+    return call("ImageResize.TargetNames");
   },
 } as const;
 
