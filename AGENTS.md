@@ -43,7 +43,9 @@ m-tools/
 ├── internal/             # ⭐ 各工具的后端实现（一个工具一个包）
 │   ├── system/           # System 服务：主机信息 + 窗口主题（system.go / theme.go）
 │   ├── mp4gif/           # MP4→GIF 服务：service / wire / media / files / events
-│   ├── imgconv/          # 图片格式转换服务：service / wire / format / decode / convert / files
+│   ├── imgfmt/           # 图片工具共享层：格式表 + probe + decode→resize→flatten→encode 管线
+│   ├── imgconv/          # 图片格式转换服务：service / wire / files（纯转格式，不改尺寸）
+│   ├── imgresize/        # 图片大小服务：service / wire / files（比例/精确尺寸，可放大）
 │   └── reveal/           # 共享：在系统文件管理器中打开目录（darwin/windows/other 三份）
 ├── app.go                # 根包 mtools：AppName/Version 等应用元数据；go:embed 无法引用上级路径，
 ├── assets_ffmpeg.go      #   所以 with_ffmpeg 的嵌入 hook（//go:build with_ffmpeg）留在根
@@ -163,19 +165,22 @@ m-tools/
 - mygo 服务包装在 `internal/mp4gif/`（`service.go` 生命周期与取消守卫、`wire.go` IPC 类型、`media.go` ffmpeg 桥接、`files.go` 对话框/保存/打开目录、`events.go` 进度事件）；一次只跑一个任务（转换或预览，`CancelActive` 取消）。打开文件夹走共享包 `internal/reveal`（`reveal.Open`，darwin/windows/other 三份平台文件）。
 - 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
 
-## 图片格式转换工具要点（imgconv）
+## 图片工具要点（imgconv / imgresize / imgfmt）
 
+- 两个图片工具共用 `internal/imgfmt`（格式注册表、magic 嗅探 probe、decode→resize→flatten→encode 内存管线），格式知识与缩放/白底合成逻辑都在这里，服务层只做守卫与 IPC 粘合：
+  - **图片格式转换（imgconv）**：只转格式，不改尺寸（无任何缩放参数）；`Convert` 保持源像素大小。
+  - **图片大小（imgresize）**：按比例（1–400%，可放大）或精确尺寸（width/height，`lock=true` 时单轴按源比例推导另一轴）调整；`Resize` 里 `resolveSize` 算目标像素后交给同一管线；输出格式可顺带切换（含保持原格式）。
+  - 两个服务各自绑定 `ImageConv` / `ImageResize`（`BindAs` 指针），API 形状一致：`Supported/TargetNames/Probe/PickImages/<Convert|Resize>/SaveAs/OpenFolder/CancelActive`。
 - 纯 Go（默认构建）：标准库覆盖 PNG/JPEG/GIF，`golang.org/x/image` 覆盖 BMP/TIFF 与缩放（`draw.CatmullRom`）；**WebP 编解码只在 `-tags with_webp` 构建**（见下方构建变体）。
 - **WebP 封装原则**（镜像 ffmpeg 模块的边界）：cgo 依赖 `chai2010/webp`（内嵌 libwebp C 源码，无需系统 libwebp）只存在于独立 gomod `webp/` 中：
   - `webp.Supported() bool` —— 当前构建是否有编解码能力
   - `webp.Decode/DecodeConfig/Encode` —— with_webp 构建为真实现；否则返回哨兵 `webp.ErrUnsupported`
-  - `webp.Register()` —— with_webp 构建在 `imgconv` 的 init 里调用，向 `image` 包注册 webp 魔数；stub 构建是 no-op（保证 `image.Decode` 不误认 webp 字节）
-- mygo 服务包装在 `internal/imgconv/`（`service.go` 互斥/取消守卫、`wire.go` IPC 类型、`format.go` 格式表（magic/decode/encode 闭包）、`decode.go` probe+alpha 检测、`convert.go` 流水线、`files.go` 多选对话框/另存/打开目录）。
-- **转换流水线全在内存**（`bytes.Buffer`，无临时文件）：`image.Decode`（动图取首帧）→ 可选缩放（只缩小不放大，MaxWidth=0 原尺寸）→ 带 alpha 转 JPEG 合白底 → 编码写盘到源文件旁（同名冲突加 `-1` 后缀）。
-- 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。
-- **批量 = 前端逐张循环调 `Convert`**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
-- 前端页面 `webview/src/tools/ImageConv.tsx`：挂载先调 `ImageConv.Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。
-- 测试：`internal/imgconv` 合成图 round-trip（矩阵/白底合成/首帧/缩放/命名冲突/取消）+ `webp_probe_test.go`（双构建行为分叉）；`webp/` 模块在两种 tag 下都有测试。
+  - `webp.Register()` —— with_webp 构建在两个图片服务的 init 里调用，向 `image` 包注册 webp 魔数；stub 构建是 no-op（保证 `image.Decode` 不误认 webp 字节）
+- **流水线全在内存**（`bytes.Buffer`，无临时文件）：`image.Decode`（动图取首帧）→ `imgfmt.Resize`（两轴独立，0=保持该轴；放大允许，钳制策略归 imgresize）→ 带 alpha 转 JPEG 合白底 → 编码写盘到源文件旁（同名冲突加 `-1` 后缀）。
+- 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP——无损目标下前端把画质框禁用；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。
+- **批量 = 前端逐张循环调单张 API**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
+- 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），混用 id 与标签会导致触发框空白（Kobalte 按 `value ∈ options` 回显）。
+- 测试：`internal/imgfmt` 合成图 round-trip（矩阵/白底合成/首帧/上下采样/部分轴/命名冲突/取消 + stub webp 行为）；`internal/imgresize` 的 `resolveSize`（百分比/锁比例推导/取整/非法输入）；`webp/` 模块在两种 tag 下都有测试。
 
 ## 版本与构建
 
