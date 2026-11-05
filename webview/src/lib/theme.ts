@@ -5,16 +5,12 @@ export type ThemeMode = "light" | "dark" | "system";
 
 const STORAGE_KEY = "mtools-theme";
 
+const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+
 function loadMode(): ThemeMode {
   const v = localStorage.getItem(STORAGE_KEY);
   return v === "light" || v === "dark" || v === "system" ? v : "system";
 }
-
-const [mode, setMode] = createSignal<ThemeMode>(loadMode());
-const [isDark, setIsDark] = createSignal(resolveDark(mode()));
-
-const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
-systemDark.addEventListener("change", applyTheme);
 
 function resolveDark(m: ThemeMode): boolean {
   return m === "system" ? systemDark.matches : m === "dark";
@@ -32,6 +28,10 @@ function syncWindow() {
   System.setWindowTheme(mode()).catch(() => {});
 }
 
+const [mode, setMode] = createSignal<ThemeMode>(loadMode());
+const [isDark, setIsDark] = createSignal(resolveDark(mode()));
+
+systemDark.addEventListener("change", applyTheme);
 applyTheme();
 syncWindow();
 
