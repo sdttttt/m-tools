@@ -146,6 +146,7 @@ m-tools/
   - `ffmpeg.UseBundledDir(func() (dir, error))` —— with_ffmpeg 构建的注入点（main 包 init 里注册）
   - `ffmpeg.EnvDir`（`MTOOLS_FFMPEG_DIR`）—— 开发/测试用环境变量覆盖
 - 查找顺序：`$MTOOLS_FFMPEG_DIR` → `with_ffmpeg` 构建内嵌包（解压到用户缓存目录）→ 可执行文件旁的 `bin/` → PATH。
+- Windows 上 ffmpeg/ffprobe 是 console 程序，GUI 版 exe（`-H=windowsgui`）直接启动会弹黑窗口；模块内所有子进程启动都调用 `hideConsole`（`exec_windows.go`，`CREATE_NO_WINDOW`），新增 exec 调用点必须记得调用（`exec_other.go` 为非 Windows 的空实现）。
 - **构建变体**：`go build`（默认，依赖系统/环境 PATH 的 ffmpeg）；`go build -tags with_ffmpeg`（捆绑 `resources/bin/` 下的 ffmpeg/ffprobe 进单二进制，运行时首次解压）。
 - 转换策略：两遍 palettegen/paletteuse（GIF 质量关键），FPS/宽度不超过源视频；进度经 `-progress pipe:1` 解析后通过 `mp4gifProgress` 事件推给前端（palette 占 30% / encode 占 70%）。
 - 截取范围：前端 `components/TrimTimeline.tsx` 是胶片时间轴（拖起点/终点手柄，拖选中段整体平移，方向键 ±0.1s、Shift ±1s），起点/终点数值输入框与之同步；缩略图经 `Mp4Gif.Thumbnails`（12 帧、160px 宽、data URL）加载，失败时退化为纯色轨道仍可拖拽。

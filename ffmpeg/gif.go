@@ -243,6 +243,7 @@ func readGIFMeta(path string) (GIFResult, error) {
 
 func runFFmpeg(ctx context.Context, ffmpeg string, args []string, onLine func(key, val string)) error {
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
+	hideConsole(cmd)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("启动 ffmpeg: %w", err)

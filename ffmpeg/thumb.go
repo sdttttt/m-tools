@@ -46,6 +46,7 @@ func (c *Client) Thumbnails(ctx context.Context, input string, count, width int,
 	cmd := exec.CommandContext(ctx, c.ffmpeg, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	hideConsole(cmd)
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()

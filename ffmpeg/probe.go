@@ -50,6 +50,7 @@ func (c *Client) Probe(ctx context.Context, path string) (VideoInfo, error) {
 	)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
+	hideConsole(cmd)
 	if err := cmd.Run(); err != nil {
 		return VideoInfo{}, fmt.Errorf("ffprobe: %v\n%s", err, tail(stderr.String()))
 	}
