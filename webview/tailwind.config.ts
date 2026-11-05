@@ -1,8 +1,10 @@
+import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
+
 /** Tailwind theme for solid-ui (shadcn-style): colors derive from the CSS
  * variables in src/index.css, which flip between light/dark via the `.dark`
  * class on <html> (see src/lib/theme.ts). */
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ["variant", [".dark &", '[data-kb-theme="dark"] &']],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -95,5 +97,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
-};
+  plugins: [animate],
+} satisfies Config;

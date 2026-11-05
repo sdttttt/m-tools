@@ -51,8 +51,8 @@ m-tools/
 │   ├── index.html        # 前端入口 HTML
 │   ├── vite.config.ts    # vite + solid 插件 + ~ 别名；dev 端口 5173（strictPort）
 │   ├── tsconfig.json     # strict；jsx preserve；paths ~/* → src（TS7 无 baseUrl）
-│   ├── tailwind.config.cjs # darkMode 走 .dark 类；颜色映射 hsl(var(--x)) token
-│   ├── postcss.config.cjs
+│   ├── tailwind.config.ts # darkMode 走 .dark 类；颜色映射 hsl(var(--x)) token
+│   │                      #   postcss 内联在 vite.config.ts（无 postcss.config.*）
 │   ├── ui.config.json   # solidui-cli 配置（别名 ~/components/ui、~/lib/utils）
 │   ├── index.html        # 前端入口 HTML
 │   ├── .oxfmtrc.json
