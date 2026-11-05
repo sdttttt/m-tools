@@ -145,6 +145,53 @@ func TestConvertGIFEndToEnd(t *testing.T) {
 	if fi, err := os.Stat(tmpRes.OutputPath); err != nil || fi.Size() == 0 {
 		t.Errorf("temp output missing/empty: %v", err)
 	}
+	os.Remove(tmpRes.OutputPath)
+}
+
+// TestConvertGIFTempOutputCleanedOnFailure converts an input ffmpeg cannot
+// decode and checks the temp output ConvertGIF created for itself is removed
+// along with the failure. Only files that appear during the failed call
+// count, so leftovers from other runs on this shared temp dir don't matter.
+func TestConvertGIFTempOutputCleanedOnFailure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode")
+	}
+	client, err := New()
+	if err != nil {
+		t.Skipf("ffmpeg unavailable: %v", err)
+	}
+
+	before := map[string]bool{}
+	matches, err := filepath.Glob(filepath.Join(os.TempDir(), "m-tools-*.gif"))
+	if err != nil {
+		t.Fatalf("glob temp outputs: %v", err)
+	}
+	for _, m := range matches {
+		before[m] = true
+	}
+
+	dir := t.TempDir()
+	input := filepath.Join(dir, "input.mp4")
+	if err := os.WriteFile(input, []byte("not a video"), 0o644); err != nil {
+		t.Fatalf("write bogus input: %v", err)
+	}
+
+	if _, err := client.ConvertGIF(context.Background(), GIFRequest{Input: input}, nil); err == nil {
+		t.Fatal("bogus input: want error, got nil")
+	}
+	if _, err := os.Stat(input); err != nil {
+		t.Fatalf("bogus input itself was touched: %v", err)
+	}
+
+	matches, err = filepath.Glob(filepath.Join(os.TempDir(), "m-tools-*.gif"))
+	if err != nil {
+		t.Fatalf("glob temp outputs: %v", err)
+	}
+	for _, m := range matches {
+		if !before[m] {
+			t.Errorf("leftover temp output after failure: %s", m)
+		}
+	}
 }
 
 // makeTestVideo synthesizes a 320x240 10fps 2s testsrc clip with ffmpeg.

@@ -33,7 +33,7 @@ const (
 // GIFRequest asks for one video→GIF conversion.
 type GIFRequest struct {
 	Input       string  // source video path
-	Output      string  // target GIF path; empty → temp file, caller owns its lifecycle
+	Output      string  // target GIF path; empty → temp file, auto-removed on failure
 	StartSec    float64 // trim start; 0 = from the beginning
 	DurationSec float64 // trim length; 0 = to the end
 	TotalSec    float64 // full source duration, only used for progress
@@ -77,7 +77,10 @@ func (c *Client) ConvertGIF(ctx context.Context, req GIFRequest, onProgress func
 	palette.Close()
 	defer os.Remove(palettePath)
 
+	// A caller-supplied Output is left in place on failure; one created here
+	// is removed, so canceled or failed conversions leave nothing behind.
 	output := opts.Output
+	tmpOutput := ""
 	if output == "" {
 		tmp, err := os.CreateTemp("", "m-tools-*.gif")
 		if err != nil {
@@ -85,7 +88,13 @@ func (c *Client) ConvertGIF(ctx context.Context, req GIFRequest, onProgress func
 		}
 		tmp.Close()
 		output = tmp.Name()
+		tmpOutput = output
 	}
+	defer func() {
+		if tmpOutput != "" {
+			os.Remove(tmpOutput)
+		}
+	}()
 
 	trim := trimArgs(opts)
 	chain := gifFilterChain(opts)
@@ -120,6 +129,7 @@ func (c *Client) ConvertGIF(ctx context.Context, req GIFRequest, onProgress func
 	if err != nil {
 		return GIFResult{}, fmt.Errorf("校验输出 GIF: %w", err)
 	}
+	tmpOutput = "" // success: the temp output now belongs to the caller
 	meta.OutputPath = output
 	return meta, nil
 }
