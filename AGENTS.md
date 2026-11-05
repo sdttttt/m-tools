@@ -179,7 +179,7 @@ m-tools/
 - **流水线全在内存**（`bytes.Buffer`，无临时文件）：`image.Decode`（动图取首帧）→ `imgfmt.Resize`（两轴独立，0=保持该轴；放大允许，钳制策略归 imgresize）→ 带 alpha 转 JPEG 合白底 → 编码写盘到源文件旁（同名冲突加 `-1` 后缀）。
 - 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP——无损目标下前端把画质框禁用；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。
 - **批量 = 前端逐张循环调单张 API**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
-- 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），混用 id 与标签会导致触发框空白（Kobalte 按 `value ∈ options` 回显）。
+- 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），且选项字符串必须与 value **逐字相等**——任何展示性修饰（如给当前项加"（当前）"后缀）都会让 Kobalte 匹配失败、触发框空白；需要额外信息用 InfoTip 或页面文案表达，不要改选项文本（Kobalte 按 `value ∈ options` 回显）。
 - 测试：`internal/imgfmt` 合成图 round-trip（矩阵/白底合成/首帧/上下采样/部分轴/命名冲突/取消 + stub webp 行为）；`internal/imgresize` 的 `resolveSize`（百分比/锁比例推导/取整/非法输入）；`webp/` 模块在两种 tag 下都有测试。
 
 ## 版本与构建

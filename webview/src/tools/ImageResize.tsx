@@ -38,11 +38,13 @@ interface Row {
 type Mode = "percent" | "exact";
 
 // Output format defaults to the first picked image's own format, so a pure
-// resize keeps the format unless the user picks another one.
-function formatOptions(own: string, supported: boolean): string[] {
+// resize keeps the format unless the user picks another one. Options stay
+// bare labels: Kobalte matches `value` against options verbatim, so any
+// suffix (e.g. a "（当前）" marker) would blank the trigger text.
+function formatOptions(supported: boolean): string[] {
   return Object.entries(FORMAT_LABELS)
     .filter(([id]) => id !== "webp" || supported)
-    .map(([id, label]) => (id === own ? `${label}（当前）` : label));
+    .map(([, label]) => label);
 }
 
 export default function ImageResizeTool() {
@@ -66,7 +68,6 @@ export default function ImageResizeTool() {
   const LABEL_BY_FORMAT: Record<string, string> = Object.fromEntries(
     Object.entries(FORMAT_LABELS).map(([id, label]) => [label, id]),
   );
-  const stripCurrent = (label: string) => label.replace("（当前）", "");
 
   const firstSupported = (): ProbeRow | undefined =>
     rows().find((r) => r.info.supported && r.info.width > 0)?.info;
@@ -195,12 +196,11 @@ export default function ImageResizeTool() {
               <div class="flex flex-col gap-1">
                 <Label class="text-xs text-muted-foreground">输出格式</Label>
                 <Select
-                  options={formatOptions(format(), supported())}
+                  options={formatOptions(supported())}
                   value={FORMAT_LABELS[format()]}
                   onChange={(label) => {
-                    const clean = label ? stripCurrent(label) : "";
-                    if (clean && LABEL_BY_FORMAT[clean])
-                      setFormat(LABEL_BY_FORMAT[clean] as ImgFormat);
+                    if (label && LABEL_BY_FORMAT[label])
+                      setFormat(LABEL_BY_FORMAT[label] as ImgFormat);
                   }}
                   itemComponent={(props) => (
                     <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
@@ -231,7 +231,7 @@ export default function ImageResizeTool() {
                     <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
                   )}
                 >
-                  <SelectTrigger class="w-32" aria-label="画质">
+                  <SelectTrigger class="w-40" aria-label="画质">
                     <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
                   </SelectTrigger>
                   <SelectContent />
