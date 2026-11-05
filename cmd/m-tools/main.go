@@ -133,6 +133,25 @@ func (s *Mp4Gif) tools() (*ffmpeg.Client, error) {
 	return c, nil
 }
 
+// begin registers cancel as the running job. Only one job runs at a time,
+// which matches the page: a conversion or a preview, never both.
+func (s *Mp4Gif) begin(cancel context.CancelFunc) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancel != nil {
+		return errors.New("已有任务在运行，请先取消")
+	}
+	s.cancel = cancel
+	return nil
+}
+
+// end clears the running job.
+func (s *Mp4Gif) end() {
+	s.mu.Lock()
+	s.cancel = nil
+	s.mu.Unlock()
+}
+
 // PickVideo shows a native dialog and returns the chosen video path,
 // or "" when canceled.
 func (s *Mp4Gif) PickVideo() (string, error) {
@@ -195,6 +214,105 @@ func (s *Mp4Gif) SuggestOutput(input string) string {
 	return strings.TrimSuffix(input, ext) + ".gif"
 }
 
+// PreviewRequest asks for a quick low-resolution preview of a clip range.
+type PreviewRequest struct {
+	Path        string  `json:"path"`
+	StartSec    float64 `json:"startSec"`
+	DurationSec float64 `json:"durationSec"`
+	FPS         int     `json:"fps"`
+	MaxWidth    int     `json:"maxWidth"`
+	Quality     string  `json:"quality"` // high | balanced | compact
+}
+
+// PreviewResult is a rendered preview of the trimmed range.
+type PreviewResult struct {
+	DataURL     string  `json:"dataURL"`
+	Width       int     `json:"width"`
+	Height      int     `json:"height"`
+	Frames      int     `json:"frames"`
+	DurationSec float64 `json:"durationSec"` // rendered length, capped for speed
+	SizeBytes   int64   `json:"sizeBytes"`
+	DurationMs  int64   `json:"durationMs"`
+}
+
+// Preview caps: a preview renders fast and stays small enough to inline.
+const (
+	previewMaxSec   = 3.0
+	previewMaxWidth = 320
+	previewMaxFPS   = 15
+)
+
+// Preview renders the clip range as a GIF data URL for an inline preview,
+// honoring the page's quality choice but capping length, width and frame
+// rate so it stays quick and small.
+func (s *Mp4Gif) Preview(ctx context.Context, req PreviewRequest) (PreviewResult, error) {
+	client, err := s.tools()
+	if err != nil {
+		return PreviewResult{}, err
+	}
+	info, err := client.Probe(ctx, req.Path)
+	if err != nil {
+		return PreviewResult{}, err
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	if err := s.begin(cancel); err != nil {
+		cancel()
+		return PreviewResult{}, err
+	}
+	defer func() {
+		cancel()
+		s.end()
+	}()
+
+	duration := req.DurationSec
+	if duration <= 0 || duration > previewMaxSec {
+		duration = previewMaxSec
+	}
+	width := req.MaxWidth
+	if width <= 0 || width > previewMaxWidth {
+		width = previewMaxWidth
+	}
+	fps := req.FPS
+	if fps <= 0 || fps > previewMaxFPS {
+		fps = previewMaxFPS
+	}
+
+	start := time.Now()
+	res, err := client.ConvertGIF(runCtx, ffmpeg.GIFRequest{
+		Input:       req.Path,
+		StartSec:    req.StartSec,
+		DurationSec: duration,
+		TotalSec:    info.DurationSec,
+		FPS:         fps,
+		MaxWidth:    width,
+		Quality:     ffmpeg.Quality(req.Quality),
+		SourceFPS:   info.FPS,
+		SourceWidth: info.Width,
+	}, nil)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return PreviewResult{}, errors.New("预览已取消")
+		}
+		return PreviewResult{}, err
+	}
+	defer os.Remove(res.OutputPath)
+
+	data, err := os.ReadFile(res.OutputPath)
+	if err != nil {
+		return PreviewResult{}, err
+	}
+	return PreviewResult{
+		DataURL:     "data:image/gif;base64," + base64.StdEncoding.EncodeToString(data),
+		Width:       res.Width,
+		Height:      res.Height,
+		Frames:      res.Frames,
+		DurationSec: duration,
+		SizeBytes:   res.SizeBytes,
+		DurationMs:  time.Since(start).Milliseconds(),
+	}, nil
+}
+
 // Convert runs the conversion to completion and reports the result.
 // Progress streams through the mp4gifProgress event while it runs.
 func (s *Mp4Gif) Convert(ctx context.Context, req ConvertRequest) (ConvertResult, error) {
@@ -209,14 +327,13 @@ func (s *Mp4Gif) Convert(ctx context.Context, req ConvertRequest) (ConvertResult
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
-	s.mu.Lock()
-	s.cancel = cancel
-	s.mu.Unlock()
+	if err := s.begin(cancel); err != nil {
+		cancel()
+		return ConvertResult{}, err
+	}
 	defer func() {
 		cancel()
-		s.mu.Lock()
-		s.cancel = nil
-		s.mu.Unlock()
+		s.end()
 	}()
 
 	gifReq := ffmpeg.GIFRequest{

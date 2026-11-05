@@ -1,5 +1,5 @@
-import { createSignal, onCleanup, Show } from "solid-js";
-import { Mp4Gif, events, type ConvertResult, type VideoInfo } from "~/mygo";
+import { createEffect, createSignal, on, onCleanup, Show } from "solid-js";
+import { Mp4Gif, events, type ConvertResult, type PreviewResult, type VideoInfo } from "~/mygo";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { MIN_TRIM_SPAN, TrimTimeline } from "~/components/TrimTimeline";
@@ -62,6 +62,9 @@ export default function Mp4GifTool() {
   const [result, setResult] = createSignal<ConvertResult | null>(null);
   const [error, setError] = createSignal("");
   const [savedPath, setSavedPath] = createSignal("");
+  const [preview, setPreview] = createSignal<PreviewResult | null>(null);
+  const [previewing, setPreviewing] = createSignal(false);
+  let previewSeq = 0; // bumped whenever the preview's inputs change
 
   const unsubscribe = events.mp4gifProgress.on((p) =>
     setProgress({ stage: p.stage, percent: p.percent }),
@@ -84,6 +87,18 @@ export default function Mp4GifTool() {
     setTrimEnd(Math.min(Math.max(min, value), max));
   }
 
+  // A preview only describes the range and settings it was rendered with.
+  createEffect(
+    on(
+      [trimStart, trimEnd, fps, maxWidth, quality],
+      () => {
+        previewSeq++;
+        setPreview(null);
+      },
+      { defer: true },
+    ),
+  );
+
   async function pick() {
     const p = await Mp4Gif.pickVideo();
     if (!p) return;
@@ -96,6 +111,8 @@ export default function Mp4GifTool() {
     setTrimStart(0);
     setTrimEnd(0);
     setVideoPath(p);
+    previewSeq++;
+    setPreview(null);
     try {
       const v = await Mp4Gif.probe(p);
       setInfo(v);
@@ -135,6 +152,29 @@ export default function Mp4GifTool() {
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ""));
       setPhase("error");
+    }
+  }
+
+  async function previewClip() {
+    if (!info()) return;
+    const seq = ++previewSeq;
+    setPreviewing(true);
+    setError("");
+    try {
+      const res = await Mp4Gif.preview({
+        path: videoPath(),
+        startSec: trimStart(),
+        durationSec: Math.max(0, trimEnd() - trimStart()),
+        fps: fps(),
+        maxWidth: maxWidth(),
+        quality: quality(),
+      });
+      if (seq === previewSeq) setPreview(res);
+    } catch (e) {
+      const message = String(e).replace(/^Error:\s*/, "");
+      if (message !== "预览已取消") setError(message);
+    } finally {
+      setPreviewing(false);
     }
   }
 
@@ -236,6 +276,19 @@ export default function Mp4GifTool() {
                 </Select>
               </div>
             </div>
+
+            {/* 片段预览 */}
+            <Show when={preview()}>
+              {(p) => (
+                <div class="flex flex-col gap-2 border-t pt-3">
+                  <img class="mx-auto max-h-56 rounded-md" src={p().dataURL} alt="片段预览" />
+                  <p class="m-0 text-center text-xs text-muted-foreground">
+                    预览 {p().durationSec.toFixed(1)} 秒 · {p().width}×{p().height} · {p().frames}{" "}
+                    帧 · {fmtSize(p().sizeBytes)}
+                  </p>
+                </div>
+              )}
+            </Show>
           </CardContent>
         </Card>
       </Show>
@@ -245,9 +298,24 @@ export default function Mp4GifTool() {
         <Show
           when={converting()}
           fallback={
-            <Button onClick={convert} disabled={!info()}>
-              开始转换
-            </Button>
+            <>
+              <Button onClick={convert} disabled={!info() || previewing()}>
+                开始转换
+              </Button>
+              <Show
+                when={previewing()}
+                fallback={
+                  <Button variant="outline" onClick={previewClip} disabled={!info()}>
+                    预览片段
+                  </Button>
+                }
+              >
+                <Button variant="outline" onClick={() => Mp4Gif.cancelActive()}>
+                  取消预览
+                </Button>
+                <span class="text-sm text-muted-foreground">生成预览…</span>
+              </Show>
+            </>
           }
         >
           <Button variant="outline" onClick={() => Mp4Gif.cancelActive()}>

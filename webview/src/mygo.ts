@@ -32,6 +32,29 @@ export interface GIFProgress {
   percent: number;
 }
 
+/** PreviewRequest asks for a quick low-resolution preview of a clip range. */
+export interface PreviewRequest {
+  path: string;
+  startSec: number;
+  durationSec: number;
+  fps: number;
+  maxWidth: number;
+  /** high | balanced | compact */
+  quality: string;
+}
+
+/** PreviewResult is a rendered preview of the trimmed range. */
+export interface PreviewResult {
+  dataURL: string;
+  width: number;
+  height: number;
+  frames: number;
+  /** rendered length, capped for speed */
+  durationSec: number;
+  sizeBytes: number;
+  durationMs: number;
+}
+
 /** Stage names reported through GIFProgress.Stage. */
 export type Stage = "palette" | "encode";
 
@@ -106,6 +129,14 @@ export const Mp4Gif = {
    */
   pickVideo(): Promise<string> {
     return call("Mp4Gif.PickVideo");
+  },
+  /**
+   * Preview renders the clip range as a GIF data URL for an inline preview,
+   * honoring the page's quality choice but capping length, width and frame
+   * rate so it stays quick and small.
+   */
+  preview(req: PreviewRequest): Promise<PreviewResult> {
+    return call("Mp4Gif.Preview", req);
   },
   /** Probe reads metadata of a video file. */
   probe(path: string): Promise<VideoInfo> {

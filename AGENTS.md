@@ -146,6 +146,7 @@ m-tools/
 - **构建变体**：`go build`（默认，依赖系统/环境 PATH 的 ffmpeg）；`go build -tags with_ffmpeg`（捆绑 `resources/bin/` 下的 ffmpeg/ffprobe 进单二进制，运行时首次解压）。
 - 转换策略：两遍 palettegen/paletteuse（GIF 质量关键），FPS/宽度不超过源视频；进度经 `-progress pipe:1` 解析后通过 `mp4gifProgress` 事件推给前端（palette 占 30% / encode 占 70%）。
 - 截取范围：前端 `components/TrimTimeline.tsx` 是胶片时间轴（拖起点/终点手柄，拖选中段整体平移，方向键 ±0.1s、Shift ±1s），起点/终点数值输入框与之同步；缩略图经 `Mp4Gif.Thumbnails`（12 帧、160px 宽、data URL）加载，失败时退化为纯色轨道仍可拖拽。
+- 片段预览：「预览片段」按钮调 `Mp4Gif.Preview`（前 3 秒、宽度 ≤320、fps ≤15，质量沿用当前选择）生成小 GIF 以 data URL 内联展示并自动删除临时文件；取消与转换共用 `CancelActive`，两种任务互斥（`begin`/`end` 守卫）；裁剪或参数变化后旧预览自动失效。
 - mygo 服务包装（Bind/事件/对话框/取消/预览/保存）在 `cmd/m-tools/main.go`；一次只跑一个转换任务（`CancelActive`）。
 - 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
 
