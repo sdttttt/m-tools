@@ -32,6 +32,49 @@ export interface GIFProgress {
   percent: number;
 }
 
+/**
+ * ImageInfo describes one picked image. HasAlpha flags sources that would
+ * need flattening when the target is JPEG; Format is the canonical
+ * lowercase extension-style id (png, jpg, gif, webp, bmp, tiff).
+ */
+export interface ImageInfo {
+  path: string;
+  format: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  hasAlpha: boolean;
+  /** decodable by this build */
+  supported: boolean;
+  skipReason: string;
+}
+
+/** ConvertRequest asks for one image format conversion. */
+export interface ImgconvConvertRequest {
+  path: string;
+  /** jpg | png | gif | webp | bmp | tiff */
+  targetFormat: string;
+  /** high | balanced | compact; JPEG/WebP only */
+  quality: string;
+  /** 0 keeps the source size; only shrinks */
+  maxWidth: number;
+}
+
+/**
+ * ConvertResult reports one finished conversion. OutputPath sits next to
+ * the source file (-1 suffix on name clashes) — the file is already saved;
+ * SaveAs exists for "save a copy elsewhere".
+ */
+export interface ImgconvConvertResult {
+  outputPath: string;
+  format: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+  durationMs: number;
+  previewDataURL: string;
+}
+
 /** PreviewRequest asks for a quick low-resolution preview of a clip range. */
 export interface PreviewRequest {
   path: string;
@@ -159,6 +202,56 @@ export const Mp4Gif = {
    */
   thumbnails(path: string): Promise<string[]> {
     return call("Mp4Gif.Thumbnails", path);
+  },
+} as const;
+
+/**
+ * Service is the image conversion tool. Conversions run one at a time (the
+ * page drives a batch as a sequence of single Convert calls), guarded by
+ * the same begin/end pattern as the mp4gif service.
+ */
+export const ImageConv = {
+  /** CancelActive stops the running conversion, if any. */
+  cancelActive(): Promise<void> {
+    return call("ImageConv.CancelActive");
+  },
+  /**
+   * Convert converts one image to the requested format and writes the result
+   * next to the source file. The page drives batches by calling this once
+   * per row; ctx cancellation (CancelActive) stops the current image.
+   */
+  convert(req: ImgconvConvertRequest): Promise<ImgconvConvertResult> {
+    return call("ImageConv.Convert", req);
+  },
+  /** OpenFolder reveals the file's folder in the OS file manager. */
+  openFolder(path: string): Promise<void> {
+    return call("ImageConv.OpenFolder", path);
+  },
+  /**
+   * PickImages shows a native multi-select dialog and returns the chosen
+   * paths, or nil when canceled.
+   */
+  pickImages(): Promise<string[]> {
+    return call("ImageConv.PickImages");
+  },
+  /** Probe reads metadata of one picked image. */
+  probe(path: string): Promise<ImageInfo> {
+    return call("ImageConv.Probe", path);
+  },
+  /**
+   * SaveAs shows a native save dialog and copies the converted image there.
+   * Returns the destination path, or "" when canceled.
+   */
+  saveAs(source: string, defaultName: string): Promise<string> {
+    return call("ImageConv.SaveAs", source, defaultName);
+  },
+  /**
+   * Supported reports whether WebP decode/encode is compiled into this build
+   * (with_webp tag). The page calls it once on mount to disable webp options
+   * with a hint instead of a runtime error.
+   */
+  supported(): Promise<boolean> {
+    return call("ImageConv.Supported");
   },
 } as const;
 

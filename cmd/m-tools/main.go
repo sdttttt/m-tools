@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo"
 	mtools "github.com/sdttttt/m-tools"
+	"github.com/sdttttt/m-tools/internal/imgconv"
 	"github.com/sdttttt/m-tools/internal/mp4gif"
 	"github.com/sdttttt/m-tools/internal/system"
 )
@@ -17,6 +18,7 @@ import (
 func main() {
 	mygo.BindAs("System", system.Service{})
 	mygo.BindAs("Mp4Gif", &mp4gif.Service{})
+	mygo.BindAs("ImageConv", &imgconv.Service{})
 
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{

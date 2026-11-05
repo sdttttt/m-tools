@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
+	"github.com/sdttttt/m-tools/internal/reveal"
 )
 
 // PickVideo shows a native dialog and returns the chosen video path,
@@ -70,5 +71,5 @@ func (s *Service) SaveAs(source, defaultName string) (string, error) {
 
 // OpenFolder reveals the file's folder in the OS file manager.
 func (s *Service) OpenFolder(path string) error {
-	return reveal(filepath.Dir(path))
+	return reveal.Open(filepath.Dir(path))
 }
