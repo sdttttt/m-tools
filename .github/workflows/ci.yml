@@ -5,6 +5,15 @@ on:
     branches: [master]
     tags: ["v*"]
   pull_request:
+    # Docs-only PRs skip CI entirely. Push filtering is done by the
+    # changes job below: paths filters would also apply to tag pushes,
+    # silently killing releases.
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+      - "THIRD-PARTY-NOTICES.md"
+      - ".gitignore"
+      - ".agents/**"
 
 # Read-only by default; the release job asks for write access.
 permissions:
@@ -16,8 +25,47 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
+  changes:
+    name: detect source changes
+    # Tag pushes have no usable diff base; tags bypass this job and always
+    # run (the release depends on them).
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # On push this diffs github.event.before against the pushed commit.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            source:
+              - "*.go"
+              - "**/*.go"
+              - "go.mod"
+              - "go.sum"
+              - "bun.lock"
+              - "package.json"
+              - "mygo.config.ts"
+              - "cmd/**"
+              - "internal/**"
+              - "ffmpeg/**"
+              - "webview/**"
+              - "resources/**"
+
   test:
     name: test
+    needs: changes
+    # Tag pushes always run (release depends on it). Master pushes run only
+    # when at least one pushed commit touched source files.
+    if: |
+      always() && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        (github.event_name == 'push' && needs.changes.outputs.source == 'true') ||
+        github.event_name == 'pull_request'
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +150,7 @@ jobs:
   build:
     name: build (${{ matrix.platform }})
     needs: test
+    if: ${{ !cancelled() && needs.test.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
