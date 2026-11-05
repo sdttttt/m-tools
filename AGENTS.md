@@ -46,6 +46,8 @@ m-tools/
 │   ├── imgfmt/           # 图片工具共享层：格式表 + probe + decode→resize→flatten→encode 管线
 │   ├── imgconv/          # 图片格式转换服务：service / wire / files（纯转格式，不改尺寸）
 │   ├── imgresize/        # 图片大小服务：service / wire / files（比例/精确尺寸，可放大）
+│   ├── imgopt/           # 图片质量优化服务：optimize（各格式无损策略）/ wire / service / files
+│   ├── imgfile/          # 图片工具共享：选图/保存对话框、复制另存、打开目录
 │   └── reveal/           # 共享：在系统文件管理器中打开目录（darwin/windows/other 三份）
 ├── app.go                # 根包 mtools：AppName/Version 等应用元数据；go:embed 无法引用上级路径，
 ├── assets_ffmpeg.go      #   所以 with_ffmpeg 的嵌入 hook（//go:build with_ffmpeg）留在根
@@ -165,22 +167,28 @@ m-tools/
 - mygo 服务包装在 `internal/mp4gif/`（`service.go` 生命周期与取消守卫、`wire.go` IPC 类型、`media.go` ffmpeg 桥接、`files.go` 对话框/保存/打开目录、`events.go` 进度事件）；一次只跑一个任务（转换或预览，`CancelActive` 取消）。打开文件夹走共享包 `internal/reveal`（`reveal.Open`，darwin/windows/other 三份平台文件）。
 - 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
 
-## 图片工具要点（imgconv / imgresize / imgfmt）
+## 图片工具要点（imgconv / imgresize / imgopt / imgfile）
 
-- 两个图片工具共用 `internal/imgfmt`（格式注册表、magic 嗅探 probe、decode→resize→flatten→encode 内存管线），格式知识与缩放/白底合成逻辑都在这里，服务层只做守卫与 IPC 粘合：
+- 各图片工具共用 `internal/imgfmt`（格式注册表、magic 嗅探 probe、decode→resize→flatten→encode 管线）与 `internal/imgfile`（选图/保存对话框、复制另存、reveal），格式知识、缩放/白底合成与文件交互都在共享层，服务层只做守卫与 IPC 粘合：
   - **图片格式转换（imgconv）**：只转格式，不改尺寸（无任何缩放参数）；`Convert` 保持源像素大小。
   - **图片大小（imgresize）**：按比例（1–400%，可放大）或精确尺寸（width/height，`lock=true` 时单轴按源比例推导另一轴）调整；`Resize` 里 `resolveSize` 算目标像素后交给同一管线；输出格式可顺带切换（含保持原格式）。
-  - 两个服务各自绑定 `ImageConv` / `ImageResize`（`BindAs` 指针），API 形状一致：`Supported/TargetNames/Probe/PickImages/<Convert|Resize>/SaveAs/OpenFolder/CancelActive`。
+  - **图片质量优化（imgopt）**：像素级无损压缩，输出带 `-min` 后缀的副本（`imgfmt.OutputFor` 防冲突），**绝不覆盖源文件、绝不写出更大的文件**（产物 ≥ 源时标「已是最优」不写盘）。按格式分发（`optimize.go`）：
+    - PNG：全量解码 → 唯一色 ≤256 且 alpha 只取全透明/不透明 → 索引色重编码（逐像素 16-bit 通道校验等值，失败退回全色 `png.BestCompression`）；APNG（嗅探 `acTL` chunk）跳过
+    - JPEG：**字节级剥离 APPn/COM 元数据段，零解码零编码**（DQT/SOS 后的熵编码数据原样保留）；无段可剥即「已是最优」
+    - TIFF：解码 → Deflate 重编码；静态 GIF：重编码（`gif.DecodeAll` 判帧数，多帧跳过）；WebP：VP8L 无损重编码（仅 with_webp，`webp.EncodeLossless`；VP8X 动画位判动图）；BMP：整格式跳过（无压缩空间）
+    - 动图（APNG/动 GIF/动 WebP）一律跳过——「动图取首帧」的管线语义对优化工具是破坏性的
+  - 图片服务文件交互（`PickImages`/`SaveAs`/`OpenFolder`）统一走 `internal/imgfile`，新增图片工具不要复制这份逻辑。
+  - 三个图片服务各自绑定 `ImageConv` / `ImageResize` / `ImageOptimize`（`BindAs` 指针），API 形状一致：`Supported/Probe/PickImages/<Convert|Resize|Optimize>/SaveAs/OpenFolder/CancelActive`（imgconv/imgresize 另有 `TargetNames`；imgopt 无参数无选项）。
 - 纯 Go（默认构建）：标准库覆盖 PNG/JPEG/GIF，`golang.org/x/image` 覆盖 BMP/TIFF 与缩放（`draw.CatmullRom`）；**WebP 编解码只在 `-tags with_webp` 构建**（见下方构建变体）。
 - **WebP 封装原则**（镜像 ffmpeg 模块的边界）：cgo 依赖 `chai2010/webp`（内嵌 libwebp C 源码，无需系统 libwebp）只存在于独立 gomod `webp/` 中：
   - `webp.Supported() bool` —— 当前构建是否有编解码能力
   - `webp.Decode/DecodeConfig/Encode` —— with_webp 构建为真实现；否则返回哨兵 `webp.ErrUnsupported`
   - `webp.Register()` —— with_webp 构建在两个图片服务的 init 里调用，向 `image` 包注册 webp 魔数；stub 构建是 no-op（保证 `image.Decode` 不误认 webp 字节）
 - **流水线全在内存**（`bytes.Buffer`，无临时文件）：`image.Decode`（动图取首帧）→ `imgfmt.Resize`（两轴独立，0=保持该轴；放大允许，钳制策略归 imgresize）→ 带 alpha 转 JPEG 合白底 → 编码写盘到源文件旁（同名冲突加 `-1` 后缀）。
-- 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP——无损目标下前端把画质框禁用；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。
+- 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP——无损目标下前端把画质框禁用；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。imgopt 与此相反：目标是**保元数据以外的一切**（JPEG 剥元数据是它的优化手段，属预期行为）。
 - **批量 = 前端逐张循环调单张 API**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
-- 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），且选项字符串必须与 value **逐字相等**——任何展示性修饰（如给当前项加"（当前）"后缀）都会让 Kobalte 匹配失败、触发框空白；需要额外信息用 InfoTip 或页面文案表达，不要改选项文本（Kobalte 按 `value ∈ options` 回显）。
-- 测试：`internal/imgfmt` 合成图 round-trip（矩阵/白底合成/首帧/上下采样/部分轴/命名冲突/取消 + stub webp 行为）；`internal/imgresize` 的 `resolveSize`（百分比/锁比例推导/取整/非法输入）；`webp/` 模块在两种 tag 下都有测试。
+- 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态——六态含 `optimizing`）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`、`tools/ImageOptimize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），且选项字符串必须与 value **逐字相等**——任何展示性修饰（如给当前项加"（当前）"后缀）都会让 Kobalte 匹配失败、触发框空白；需要额外信息用 InfoTip 或页面文案表达，不要改选项文本（Kobalte 按 `value ∈ options` 回显）。
+- 测试：`internal/imgfmt` 合成图 round-trip（矩阵/白底合成/首帧/上下采样/部分轴/命名冲突/取消 + stub webp 行为）；`internal/imgresize` 的 `resolveSize`（百分比/锁比例推导/取整/非法输入）；`internal/imgopt` 各格式策略（噪声 PNG 收缩+像素等值、palette 路径、半透明不走 palette、JPEG 剥段保 DQT/EOI、动/静 GIF、BMP/未知跳过、APNG、守卫不写更大文件）；`webp/` 模块在两种 tag 下都有测试。
 
 ## 版本与构建
 

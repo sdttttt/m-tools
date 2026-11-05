@@ -83,11 +83,12 @@ export async function probeAll(
   );
 }
 
-export type RowState = "pending" | "converting" | "done" | "failed" | "skipped";
+export type RowState = "pending" | "converting" | "optimizing" | "done" | "failed" | "skipped";
 
 export const STATE_LABELS: Record<RowState, string> = {
-  pending: "待转换",
+  pending: "待处理",
   converting: "转换中…",
+  optimizing: "优化中…",
   done: "完成",
   failed: "失败",
   skipped: "跳过",
@@ -96,6 +97,7 @@ export const STATE_LABELS: Record<RowState, string> = {
 export const STATE_COLORS: Record<RowState, string> = {
   pending: "text-muted-foreground",
   converting: "text-muted-foreground",
+  optimizing: "text-muted-foreground",
   done: "text-primary",
   failed: "text-destructive",
   skipped: "text-destructive",

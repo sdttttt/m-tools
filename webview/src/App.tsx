@@ -6,8 +6,9 @@ import { ThemeToggle } from "~/components/ThemeToggle";
 import Mp4GifTool from "~/tools/Mp4Gif";
 import ImageConvTool from "~/tools/ImageConv";
 import ImageResizeTool from "~/tools/ImageResize";
+import ImageOptimizeTool from "~/tools/ImageOptimize";
 
-type ToolId = "mp4gif" | "imgconv" | "imgresize";
+type ToolId = "mp4gif" | "imgconv" | "imgresize" | "imgoptimize";
 
 const TOOLS: { id: ToolId; name: string; desc: string }[] = [
   { id: "mp4gif", name: "MP4 → GIF", desc: "视频转 GIF 动图，可裁剪、调帧率与画质" },
@@ -20,6 +21,11 @@ const TOOLS: { id: ToolId; name: string; desc: string }[] = [
     id: "imgresize",
     name: "图片大小",
     desc: "按比例或自定义尺寸调整图片大小，可顺带转格式",
+  },
+  {
+    id: "imgoptimize",
+    name: "图片质量优化",
+    desc: "像素级无损压缩 PNG / JPEG / TIFF / GIF，输出 -min 副本",
   },
 ];
 
@@ -69,6 +75,7 @@ export default function App() {
           {tool() === "mp4gif" && <Mp4GifTool />}
           {tool() === "imgconv" && <ImageConvTool />}
           {tool() === "imgresize" && <ImageResizeTool />}
+          {tool() === "imgoptimize" && <ImageOptimizeTool />}
         </Show>
       </main>
       <footer class="px-8 py-3 text-xs">
