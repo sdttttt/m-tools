@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
+import unocss from "unocss/vite";
 import solid from "vite-plugin-solid";
 
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [unocss(), solid()],
   server: {
     // The app loads this address during `mygo dev` (devUrl in mygo.config.ts).
     port: 5173,

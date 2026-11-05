@@ -12,6 +12,7 @@
 | 前端 UI       | SolidJS + TypeScript                                               | 运行在系统 webview（macOS: WKWebView / Windows: WebView2） |
 | 包管理        | bun                                                                | 前端依赖一律用 `bun add`，不用 npm/pnpm/yarn               |
 | 构建器        | vite + vite-plugin-solid                                           |                                                            |
+| 原子化 CSS    | [UnoCSS](https://unocss.dev)（v66，presetWind3）                   | 组件样式一律用原子类                                       |
 | Lint / 格式化 | oxlint / oxfmt                                                     | 不引入 eslint / prettier / biome                           |
 | 后端          | Go（纯 Go，无 cgo）                                                | 系统能力、复杂逻辑                                         |
 | 可选 WASM     | Rust                                                               | 仅在边界收益明确时使用，见下文决策规则                     |
@@ -43,10 +44,10 @@ m-tools/
 ├── tsconfig.json         # strict；jsx preserve + jsxImportSource solid-js
 ├── index.html            # 前端入口 HTML
 ├── src/
-│   ├── index.tsx         # render(App)
+│   ├── index.tsx         # render(App)；先 import virtual:uno.css
 │   ├── App.tsx           # 根组件
-│   ├── style.css         # 全局样式，CSS 变量，跟随系统深浅色
 │   └── mygo.ts           # ⚠️ 生成物：bun run generate
+├── uno.config.ts         # UnoCSS：presetWind3，dark:"media"，主题色映射 CSS 变量
 ├── resources/            # 应用图标等资源
 ├── build/                # mygo build 产物（gitignore）
 ├── .agents/skills/mygo-maintenance/  # MyGo 维护 skill（脚手架自带）
@@ -73,7 +74,10 @@ m-tools/
 
 - 组件文件 PascalCase（`Foo.tsx`），入口/工具文件小写。
 - SolidJS 响应式红线：不要解构 props、不要用对象展开丢失响应性、粒度用 signal/memo 而非大状态对象。
-- 样式集中在 `style.css` 或组件旁的 CSS；用 CSS 变量（`--bg`、`--fg`、`--card`…）；必须同时适配浅色/深色（`prefers-color-scheme`）。**窗口 `BackgroundColor`（main.go）与 `--bg` 保持一致**，避免启动闪白/闪黑。
+- **禁止手写 .css 文件**。样式一律用 UnoCSS 原子类（presetWind3）。语义色 token 定义在 `uno.config.ts` 的 `theme.colors`，映射 preflight 里的 CSS 变量：`bg-bg`、`text-fg`、`text-muted`、`bg-card`、`border-line`、`text-accent`。新增语义色：在 uno.config.ts 的 preflights 加变量（浅/深两套）→ theme.colors 映射 → 组件里用类名。
+- 基础 token 与 reset（CSS 变量、body 字体/背景、color-scheme）全部放在 `uno.config.ts` 的 `preflights` 中，由 `virtual:uno.css` 注入；页面级特例也优先用原子类解决。
+- `dark:` 变体配置为 `media` 模式（跟随系统），与 CSS 变量的翻转机制一致；大部分场景用语义 token 即可，不需要写 dark: 变体。
+- 必须同时适配浅色/深色。**窗口 `BackgroundColor`（main.go）与 `--bg` 保持一致**，避免启动闪白/闪黑。
 - `src/mygo.ts` 的类型即 IPC 契约：Go 返回类型变更后先 `bun run generate` 再写前端。
 
 ### Go

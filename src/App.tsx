@@ -5,21 +5,21 @@ export default function App() {
   const [info] = createResource(System.info);
 
   return (
-    <div class="app">
-      <header>
-        <h1>M-Tools</h1>
-        <p class="muted">个人工具箱</p>
+    <div class="flex flex-col min-h-screen">
+      <header class="px-8 pt-6 pb-2">
+        <h1 class="m-0 text-xl font-semibold">M-Tools</h1>
+        <p class="mt-1 text-sm text-muted">个人工具箱</p>
       </header>
-      <main>
-        <div class="placeholder">
+      <main class="flex-1 grid place-items-center px-8 py-4">
+        <div class="border-line rounded-xl border border-dashed px-16 py-12 text-center">
           <p>工具会出现在这里。</p>
-          <p class="muted">第一个功能待规划…</p>
+          <p class="mt-1 text-sm text-muted">第一个功能待规划…</p>
         </div>
       </main>
-      <footer>
+      <footer class="px-8 py-3 text-xs">
         <Show when={info()}>
           {(v) => (
-            <span class="muted">
+            <span class="text-muted">
               {v().os}/{v().arch} · v{v().appVer} · {v().goVersion}
             </span>
           )}

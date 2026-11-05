@@ -44,7 +44,7 @@ func main() {
 			Height:          640,
 			MinWidth:        480,
 			MinHeight:       360,
-			BackgroundColor: "light-dark(#f6f7f9, #0f1115)", // the page's --bg in src/style.css
+			BackgroundColor: "light-dark(#f6f7f9, #0f1115)", // the page's --bg in uno.config.ts preflight
 			// Opens where the user left it last time.
 			StateKey: "main",
 			// The frontend: devUrl during `mygo dev`, frontendDist
