@@ -157,7 +157,14 @@ m-tools/
 
 - 版本号同步：`mygo.config.ts` 的 `version` 与根包 `app.go` 的 `Version` 常量；发版时一并改。
 - `mygo build` 会把 `frontendDist`（`dist/`）嵌入二进制；`build/` 下产物按平台输出（macOS app bundle / Windows exe）。
-- 目标平台只有 darwin (amd64/arm64) 和 windows (amd64)；构建/签名/公证脚本将来单独安排。
+- 目标平台只有 darwin (amd64/arm64) 和 windows (amd64)；签名/公证脚本将来单独安排。
+
+## CI 与发布（.github/workflows/ci.yml）
+
+- push/PR：`test` 跑 gofmt、版本一致性、生成物漂移检查（`bun run generate` 后 `git diff` 为空）、Go vet/build/test、ffmpeg 模块集成测试、`mygo vet` 与前端 format/lint/typecheck；通过后 `build` 在 macos-14 构建 `darwin/universal`、在 windows-latest 构建 `windows/amd64`，安装包经 `upload-artifact` 传递。
+- 打 tag `vX.Y.Z`：额外触发 `release`，用 `gh release create/upload` 发布 `build/darwin-universal/*.dmg` 与 `build/windows-amd64/*.exe`（含 NSIS setup）；tag 必须与 `mygo.config.ts`/`app.go` 的版本一致，否则 `test` 直接失败。
+- 发布构建未带 `with_ffmpeg` 标签，运行时依赖系统 ffmpeg；要出捆绑版需先把 ffmpeg/ffprobe 放进 `resources/bin` 再调整构建参数（见上文构建变体）。
+- 签名/公证未接入：macOS 目前是 ad-hoc 签名；需要 Developer ID 时配 `macos.signingIdentity` 并注入证书（后续单独做）。
 
 ## 验证清单（提交前 / 大改后）
 

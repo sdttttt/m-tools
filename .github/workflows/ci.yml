@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+
+# Read-only by default; the release job asks for write access.
+permissions:
+  contents: read
+
+# Superseded branch and PR runs stop early; tag runs always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd webview && bun install --frozen-lockfile
+
+      - name: Check app versions
+        shell: bash
+        run: |
+          config_version=$(sed -n 's/.*version: "\([^"]*\)".*/\1/p' mygo.config.ts | head -n1)
+          go_version=$(sed -n 's/^const Version = "\([^"]*\)"/\1/p' app.go)
+          if [ -z "$config_version" ] || [ -z "$go_version" ]; then
+            echo "::error::cannot read the app version from mygo.config.ts or app.go"
+            exit 1
+          fi
+          if [ "$config_version" != "$go_version" ]; then
+            echo "::error::mygo.config.ts version $config_version != app.go Version $go_version"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v$config_version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match app version v$config_version"
+            exit 1
+          fi
+          echo "app version: $config_version"
+
+      - name: Check gofmt
+        shell: bash
+        run: |
+          files=$(gofmt -l .)
+          if [ -n "$files" ]; then
+            echo "::error::gofmt needed on:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Check the generated TypeScript client is up to date
+        run: |
+          bun run generate
+          git diff --exit-code -- webview/src/mygo.ts
+
+      - name: Go checks
+        run: |
+          go vet ./...
+          go build ./...
+          go test ./...
+
+      - name: Install ffmpeg for the module's integration tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: ffmpeg module checks
+        run: |
+          cd ffmpeg
+          go vet ./...
+          go test ./...
+
+      - name: MyGo checks
+        run: bunx mygo vet .
+
+      - name: Frontend checks
+        run: |
+          cd webview
+          bun run format:check
+          bun run lint
+          bun run typecheck
+
+  build:
+    name: build (${{ matrix.platform }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin/universal
+            artifact: macos
+          - os: windows-latest
+            platform: windows/amd64
+            artifact: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          cd webview && bun install --frozen-lockfile
+
+      - name: Build app
+        run: bunx mygo build --platform ${{ matrix.platform }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            build/darwin-universal/*.dmg
+            build/windows-amd64/*.exe
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          files=(dist/*)
+          if [ ! -e "${files[0]}" ]; then
+            echo "::error::no build artifacts to release"
+            exit 1
+          fi
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          gh release view "$GITHUB_REF_NAME" --json url --jq .url
