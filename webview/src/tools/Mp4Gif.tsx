@@ -1,13 +1,35 @@
 import { createSignal, onCleanup, Show } from "solid-js";
-import { Mp4Gif, events, type ConvertResult, type VideoInfo } from "../mygo";
+import { Mp4Gif, events, type ConvertResult, type VideoInfo } from "~/mygo";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
+import { Label } from "~/components/ui/label";
+import { Progress } from "~/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { TextField, TextFieldInput } from "~/components/ui/text-field";
 
 type Phase = "idle" | "converting" | "done" | "error";
 
-const QUALITIES = [
-  { value: "high", label: "高画质" },
-  { value: "balanced", label: "均衡" },
-  { value: "compact", label: "紧凑（体积小）" },
-] as const;
+type Quality = "high" | "balanced" | "compact";
+
+const QUALITY_LABELS = ["高画质", "均衡", "紧凑（体积小）"] as const;
+
+const QUALITY_BY_LABEL: Record<string, Quality> = {
+  高画质: "high",
+  均衡: "balanced",
+  "紧凑（体积小）": "compact",
+};
+
+const LABEL_BY_QUALITY: Record<Quality, string> = {
+  high: "高画质",
+  balanced: "均衡",
+  compact: "紧凑（体积小）",
+};
 
 const STAGE_LABELS: Record<string, string> = {
   palette: "分析调色板",
@@ -31,7 +53,7 @@ export default function Mp4GifTool() {
   const [durationSec, setDurationSec] = createSignal("");
   const [fps, setFps] = createSignal(15);
   const [maxWidth, setMaxWidth] = createSignal(480);
-  const [quality, setQuality] = createSignal("balanced");
+  const [quality, setQuality] = createSignal<Quality>("balanced");
   const [phase, setPhase] = createSignal<Phase>("idle");
   const [progress, setProgress] = createSignal({ stage: "", percent: 0 });
   const [result, setResult] = createSignal<ConvertResult | null>(null);
@@ -94,82 +116,80 @@ export default function Mp4GifTool() {
     if (dest) setSavedPath(dest);
   }
 
-  const field =
-    "w-24 rounded border border-line bg-card px-2 py-1 text-sm text-fg outline-none focus:border-accent";
-
   return (
     <div class="mx-auto flex w-full max-w-xl flex-col gap-5">
       {/* 文件选择 */}
-      <button
-        class="cursor-pointer rounded-xl border border-dashed border-line bg-card px-6 py-5 text-left hover:border-accent"
-        onClick={pick}
-        disabled={converting()}
+      <Card
+        class="cursor-pointer border-dashed transition-colors hover:border-primary"
+        onClick={() => !converting() && pick()}
       >
-        <p class="m-0 text-sm">{videoPath() || "点击选择视频文件（MP4 / MOV / MKV / WebM…）"}</p>
-        <Show when={info()}>
-          {(v) => (
-            <p class="m-0 mt-1 text-xs text-muted">
-              {v().width}×{v().height} · {v().fps.toFixed(1)} fps · {v().videoCodec} ·{" "}
-              {fmtSec(v().durationSec)} · {fmtSize(v().sizeBytes)}
-            </p>
-          )}
-        </Show>
-      </button>
+        <CardContent class="flex flex-col gap-1 px-6 py-5">
+          <p class="m-0 text-sm">{videoPath() || "点击选择视频文件（MP4 / MOV / MKV / WebM…）"}</p>
+          <Show when={info()}>
+            {(v) => (
+              <p class="m-0 text-xs text-muted-foreground">
+                {v().width}×{v().height} · {v().fps.toFixed(1)} fps · {v().videoCodec} ·{" "}
+                {fmtSec(v().durationSec)} · {fmtSize(v().sizeBytes)}
+              </p>
+            )}
+          </Show>
+        </CardContent>
+      </Card>
 
       {/* 参数 */}
       <Show when={info()}>
-        <div class="flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-line bg-card px-5 py-4 text-sm">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">起始秒</span>
-            <input
-              class={field}
-              placeholder="从头"
-              value={startSec()}
-              onInput={(e) => setStartSec(e.currentTarget.value)}
-            />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">时长秒</span>
-            <input
-              class={field}
-              placeholder="到结尾"
-              value={durationSec()}
-              onInput={(e) => setDurationSec(e.currentTarget.value)}
-            />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">帧率</span>
-            <input
-              class={field}
-              type="number"
-              min={5}
-              max={30}
-              value={fps()}
-              onInput={(e) => setFps(parseInt(e.currentTarget.value) || 15)}
-            />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">最大宽度</span>
-            <input
-              class={field}
-              type="number"
-              min={100}
-              max={1920}
-              value={maxWidth()}
-              onInput={(e) => setMaxWidth(parseInt(e.currentTarget.value) || 480)}
-            />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-muted">画质</span>
-            <select class={field} onChange={(e) => setQuality(e.currentTarget.value)}>
-              {QUALITIES.map((q) => (
-                <option value={q.value} selected={quality() === q.value}>
-                  {q.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <Card>
+          <CardContent class="flex flex-wrap items-end gap-x-6 gap-y-3 px-5 py-4">
+            <div class="flex flex-col gap-1">
+              <Label class="text-xs text-muted-foreground">起始秒</Label>
+              <TextField value={startSec()} onChange={(value: string) => setStartSec(value)}>
+                <TextFieldInput class="w-24" placeholder="从头" />
+              </TextField>
+            </div>
+            <div class="flex flex-col gap-1">
+              <Label class="text-xs text-muted-foreground">时长秒</Label>
+              <TextField value={durationSec()} onChange={(value: string) => setDurationSec(value)}>
+                <TextFieldInput class="w-24" placeholder="到结尾" />
+              </TextField>
+            </div>
+            <div class="flex flex-col gap-1">
+              <Label class="text-xs text-muted-foreground">帧率</Label>
+              <TextField
+                value={String(fps())}
+                onChange={(value: string) => setFps(parseInt(value) || 15)}
+              >
+                <TextFieldInput class="w-24" type="number" min={5} max={30} />
+              </TextField>
+            </div>
+            <div class="flex flex-col gap-1">
+              <Label class="text-xs text-muted-foreground">最大宽度</Label>
+              <TextField
+                value={String(maxWidth())}
+                onChange={(value: string) => setMaxWidth(parseInt(value) || 480)}
+              >
+                <TextFieldInput class="w-24" type="number" min={100} max={1920} />
+              </TextField>
+            </div>
+            <div class="flex flex-col gap-1">
+              <Label class="text-xs text-muted-foreground">画质</Label>
+              <Select
+                options={[...QUALITY_LABELS]}
+                value={LABEL_BY_QUALITY[quality()]}
+                onChange={(label) => {
+                  if (label) setQuality(QUALITY_BY_LABEL[label] ?? "balanced");
+                }}
+                itemComponent={(props) => (
+                  <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
+                )}
+              >
+                <SelectTrigger class="w-40" aria-label="画质">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       </Show>
 
       {/* 操作 */}
@@ -177,22 +197,15 @@ export default function Mp4GifTool() {
         <Show
           when={converting()}
           fallback={
-            <button
-              class="cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={convert}
-              disabled={!info()}
-            >
+            <Button onClick={convert} disabled={!info()}>
               开始转换
-            </button>
+            </Button>
           }
         >
-          <button
-            class="cursor-pointer rounded-lg border border-line bg-card px-4 py-2 text-sm"
-            onClick={() => Mp4Gif.cancelActive()}
-          >
+          <Button variant="outline" onClick={() => Mp4Gif.cancelActive()}>
             取消
-          </button>
-          <span class="text-sm text-muted">
+          </Button>
+          <span class="text-sm text-muted-foreground">
             {STAGE_LABELS[progress().stage] ?? "准备中"} · {percent()}%
           </span>
         </Show>
@@ -200,46 +213,38 @@ export default function Mp4GifTool() {
 
       {/* 进度条 */}
       <Show when={converting()}>
-        <div class="h-1.5 w-full overflow-hidden rounded-full bg-card">
-          <div class="h-full bg-accent transition-[width]" style={{ width: `${percent()}%` }} />
-        </div>
+        <Progress value={percent()} class="w-full" />
       </Show>
 
       {/* 结果 */}
       <Show when={result()}>
         {(r) => (
-          <div class="flex flex-col gap-3 rounded-xl border border-line bg-card px-5 py-4">
-            <Show when={r().previewDataURL}>
-              <img class="mx-auto max-h-64 rounded" src={r().previewDataURL} alt="GIF 预览" />
-            </Show>
-            <p class="m-0 text-sm">
-              {r().width}×{r().height} · {r().frames} 帧 · {fmtSize(r().sizeBytes)} · 耗时{" "}
-              {(r().durationMs / 1000).toFixed(1)} 秒
-            </p>
-            <div class="flex items-center gap-3">
-              <button
-                class="cursor-pointer rounded-lg bg-accent px-4 py-2 text-sm text-white"
-                onClick={save}
-              >
-                保存到…
-              </button>
-              <Show when={savedPath()}>
-                <button
-                  class="cursor-pointer rounded-lg border border-line bg-card px-4 py-2 text-sm"
-                  onClick={() => Mp4Gif.openFolder(savedPath())}
-                >
-                  打开文件夹
-                </button>
-                <span class="truncate text-xs text-muted">{savedPath()}</span>
+          <Card>
+            <CardContent class="flex flex-col gap-3 px-5 py-4">
+              <Show when={r().previewDataURL}>
+                <img class="mx-auto max-h-64 rounded-md" src={r().previewDataURL} alt="GIF 预览" />
               </Show>
-            </div>
-          </div>
+              <p class="m-0 text-sm">
+                {r().width}×{r().height} · {r().frames} 帧 · {fmtSize(r().sizeBytes)} · 耗时{" "}
+                {(r().durationMs / 1000).toFixed(1)} 秒
+              </p>
+              <div class="flex items-center gap-3">
+                <Button onClick={save}>保存到…</Button>
+                <Show when={savedPath()}>
+                  <Button variant="outline" onClick={() => Mp4Gif.openFolder(savedPath())}>
+                    打开文件夹
+                  </Button>
+                  <span class="truncate text-xs text-muted-foreground">{savedPath()}</span>
+                </Show>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </Show>
 
       {/* 错误 */}
       <Show when={error()}>
-        <p class="m-0 rounded-lg border border-line bg-card px-4 py-3 text-sm text-accent">
+        <p class="m-0 rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error()}
         </p>
       </Show>

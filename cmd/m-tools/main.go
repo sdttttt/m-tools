@@ -49,6 +49,35 @@ func (System) Info() SystemInfo {
 	}
 }
 
+// windowColors mirror the page's --background tokens in webview/src/index.css.
+const (
+	windowColorLight = "#ffffff"
+	windowColorDark  = "#09090b"
+)
+
+// SetWindowTheme syncs the native window chrome with the page theme mode
+// (light | dark | system): the background fill shown until the page paints,
+// and the title-bar buttons theme on macOS.
+func (System) SetWindowTheme(ctx context.Context, mode string) error {
+	win := mygo.CallerWindow(ctx)
+	if win == nil {
+		return nil
+	}
+	switch mode {
+	case "light":
+		_ = win.SetBackgroundColor(windowColorLight)
+		win.SetWindowButtonsTheme(mygo.ThemeLight)
+	case "dark":
+		_ = win.SetBackgroundColor(windowColorDark)
+		win.SetWindowButtonsTheme(mygo.ThemeDark)
+	default:
+		_ = win.SetBackgroundColor(
+			"light-dark(" + windowColorLight + ", " + windowColorDark + ")")
+		win.SetWindowButtonsTheme(mygo.ThemeSystem)
+	}
+	return nil
+}
+
 // mp4GifProgress streams conversion progress to the page. The payload is
 // the ffmpeg module's GIFProgress (json: stage/percent).
 var mp4GifProgress = mygo.NewEvent[ffmpeg.GIFProgress]("mp4gifProgress")
@@ -269,12 +298,14 @@ func main() {
 
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{
-			Title:           mtools.AppName,
-			Width:           960,
-			Height:          640,
-			MinWidth:        480,
-			MinHeight:       360,
-			BackgroundColor: "light-dark(#f6f7f9, #0f1115)", // the page's --bg in uno.config.ts preflight
+			Title:     mtools.AppName,
+			Width:     960,
+			Height:    640,
+			MinWidth:  480,
+			MinHeight: 360,
+			// The page's --background tokens (webview/src/index.css); the
+			// same pair SetWindowTheme applies when the user picks a mode.
+			BackgroundColor: "light-dark(" + windowColorLight + ", " + windowColorDark + ")",
 			// Opens where the user left it last time.
 			StateKey: "main",
 			// The frontend: devUrl during `mygo dev`, frontendDist

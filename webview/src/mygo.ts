@@ -66,6 +66,14 @@ export const System = {
   info(): Promise<SystemInfo> {
     return call("System.Info");
   },
+  /**
+   * SetWindowTheme syncs the native window chrome with the page theme mode
+   * (light | dark | system): the background fill shown until the page paints,
+   * and the title-bar buttons theme on macOS.
+   */
+  setWindowTheme(mode: string): Promise<void> {
+    return call("System.SetWindowTheme", mode);
+  },
 } as const;
 
 /**

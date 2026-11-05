@@ -12,7 +12,7 @@
 | 前端 UI       | SolidJS + TypeScript                                               | 运行在系统 webview（macOS: WKWebView / Windows: WebView2） |
 | 包管理        | bun                                                                | 前端依赖一律用 `bun add`，不用 npm/pnpm/yarn               |
 | 构建器        | vite + vite-plugin-solid                                           |                                                            |
-| 原子化 CSS    | [UnoCSS](https://unocss.dev)（v66，presetWind3）                   | 组件样式一律用原子类                                       |
+| 组件库        | [solid-ui](https://www.solid-ui.com)（Kobalte + Tailwind v3）      | shadcn 风格，组件代码复制进 webview/src/components/ui      |
 | Lint / 格式化 | oxlint / oxfmt                                                     | 不引入 eslint / prettier / biome                           |
 | 后端          | Go（纯 Go，无 cgo）                                                | 系统能力、复杂逻辑                                         |
 | 可选 WASM     | Rust                                                               | 仅在边界收益明确时使用，见下文决策规则                     |
@@ -49,14 +49,22 @@ m-tools/
 │   ├── package.json      # 前端依赖与脚本（dev/build/typecheck/lint/format）
 │   ├── bun.lock
 │   ├── index.html        # 前端入口 HTML
-│   ├── vite.config.ts    # vite + solid 插件；dev 端口 5173（strictPort）
-│   ├── tsconfig.json     # strict；jsx preserve + jsxImportSource solid-js
-│   ├── uno.config.ts     # UnoCSS：presetWind3，dark:"media"，主题色映射 CSS 变量
+│   ├── vite.config.ts    # vite + solid 插件 + ~ 别名；dev 端口 5173（strictPort）
+│   ├── tsconfig.json     # strict；jsx preserve；paths ~/* → src（TS7 无 baseUrl）
+│   ├── tailwind.config.cjs # darkMode 走 .dark 类；颜色映射 hsl(var(--x)) token
+│   ├── postcss.config.cjs
+│   ├── ui.config.json   # solidui-cli 配置（别名 ~/components/ui、~/lib/utils）
+│   ├── index.html        # 前端入口 HTML
 │   ├── .oxfmtrc.json
 │   └── src/
-│       ├── index.tsx     # render(App)；先 import virtual:uno.css
-│       ├── App.tsx       # 根组件：首页工具网格 + 视图切换
+│       ├── index.tsx     # render(App)；import index.css
+│       ├── App.tsx       # 根组件：首页工具网格 + 视图切换 + ThemeToggle
 │       ├── tools/        # 各工具页面（每个工具一个文件，如 Mp4Gif.tsx）
+│       ├── components/ui/ # solid-ui 组件（从 registry 复制，勿手写样式进这里）
+│       ├── components/ThemeToggle.tsx
+│       ├── lib/theme.ts  # 主题唯一来源（light|dark|system，持久化 + 窗口同步）
+│       ├── lib/utils.ts  # cn()
+│       ├── index.css     # 唯一 CSS：@tailwind 指令 + HSL token + body 基础
 │       └── mygo.ts       # ⚠️ 生成物：bun run generate（根目录跑）
 ├── ffmpeg/               # ⭐ 独立 gomod（github.com/sdttttt/m-tools/ffmpeg）
 │   │                     #   封装全部 ffmpeg/ffprobe 交互，见下方桥接口
@@ -93,9 +101,11 @@ m-tools/
 
 - 组件文件 PascalCase（`Foo.tsx`），入口/工具文件小写。
 - SolidJS 响应式红线：不要解构 props、不要用对象展开丢失响应性、粒度用 signal/memo 而非大状态对象。
-- **禁止手写 .css 文件**。样式一律用 UnoCSS 原子类（presetWind3）。语义色 token 定义在 `uno.config.ts` 的 `theme.colors`，映射 preflight 里的 CSS 变量：`bg-bg`、`text-fg`、`text-muted`、`bg-card`、`border-line`、`text-accent`。新增语义色：在 uno.config.ts 的 preflights 加变量（浅/深两套）→ theme.colors 映射 → 组件里用类名。
-- 基础 token 与 reset（CSS 变量、body 字体/背景、color-scheme）全部放在 `uno.config.ts` 的 `preflights` 中，由 `virtual:uno.css` 注入；页面级特例也优先用原子类解决。
-- `dark:` 变体配置为 `media` 模式（跟随系统），与 CSS 变量的翻转机制一致；大部分场景用语义 token 即可，不需要写 dark: 变体。
+- 样式一律 Tailwind 工具类（solid-ui 体系）。语义色是 HSL token：唯一 CSS 文件 `webview/src/index.css`（@tailwind 指令 + `:root`/`.dark` 两套变量 + body 基础样式），`tailwind.config.cjs` 把 `bg-primary`、`text-muted-foreground` 等映射到 `hsl(var(--x))`。新增语义色：index.css 加变量（浅/深两套）→ 组件里直接用类名，tailwind 配置不用动。
+- 组件来自 solid-ui registry：`bunx solidui-cli add <name>`（CLI 在 Windows/bun 下装依赖有 bug——给 bun 传了空参数；绕过方式：抓 `https://www.solid-ui.com/registry/ui/<name>.json`，把 `files[].content` 落盘到 `src/components/ui/`，并把内容里的 `~/registry/ui` 改写为 `~/components/ui`）。
+- **主题机制**：`lib/theme.ts` 是唯一来源。模式 `light|dark|system` 持久化在 localStorage(`mtools-theme`)，默认跟随系统；解析结果以 `.dark` 类挂到 `<html>`（tailwind darkMode variant），并经 `System.setWindowTheme` IPC 同步原生窗口 chrome（背景色常量 `windowColors` 在 cmd/m-tools/main.go，与 index.css 的 `--background` 保持一致）。UI 切换器在 `components/ThemeToggle.tsx`。
+- Kobalte 表单注意：`TextField` 的 `value`/`onChange` 挂在 **Root** 上（onChange 收字符串）；`Select` 要传 `itemComponent` 且 `<SelectContent />` 必须渲染，否则下拉不显示；`ToggleGroup` 单选模式 value 是字符串不是数组。
+- `~/*` 别名指向 `webview/src`（tsconfig paths + vite alias；TS7 已移除 baseUrl，paths 直接相对 tsconfig 解析）。
 - 必须同时适配浅色/深色。**窗口 `BackgroundColor`（cmd/m-tools/main.go）与 `--bg` 保持一致**，避免启动闪白/闪黑。
 - `webview/src/mygo.ts` 的类型即 IPC 契约：Go 返回类型变更后先 `bun run generate` 再写前端。
 

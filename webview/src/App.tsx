@@ -1,6 +1,9 @@
 import { createResource, createSignal, For, Show } from "solid-js";
-import { System } from "./mygo";
-import Mp4GifTool from "./tools/Mp4Gif";
+import { System } from "~/mygo";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardTitle } from "~/components/ui/card";
+import { ThemeToggle } from "~/components/ThemeToggle";
+import Mp4GifTool from "~/tools/Mp4Gif";
 
 type ToolId = "mp4gif";
 
@@ -13,22 +16,22 @@ export default function App() {
   const [info] = createResource(System.info);
 
   return (
-    <div class="flex flex-col min-h-screen">
-      <header class="flex items-center gap-3 px-8 pt-6 pb-2">
-        <Show when={tool()} fallback={<h1 class="m-0 text-xl font-semibold">M-Tools</h1>}>
-          {(t) => (
-            <>
-              <button
-                class="cursor-pointer rounded border border-line bg-card px-2 py-1 text-sm hover:border-accent"
-                onClick={() => setTool(null)}
-              >
-                ← 返回
-              </button>
-              <h1 class="m-0 text-xl font-semibold">{TOOLS.find((x) => x.id === t())?.name}</h1>
-            </>
-          )}
-        </Show>
-        <p class="m-0 mt-1 text-sm text-muted">个人工具箱</p>
+    <div class="flex min-h-screen flex-col">
+      <header class="flex items-center justify-between gap-3 px-8 pb-2 pt-6">
+        <div class="flex items-center gap-3">
+          <Show when={tool()} fallback={<h1 class="m-0 text-xl font-semibold">M-Tools</h1>}>
+            {(t) => (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setTool(null)}>
+                  ← 返回
+                </Button>
+                <h1 class="m-0 text-xl font-semibold">{TOOLS.find((x) => x.id === t())?.name}</h1>
+              </>
+            )}
+          </Show>
+          <p class="m-0 mt-1 text-sm text-muted-foreground">个人工具箱</p>
+        </div>
+        <ThemeToggle />
       </header>
       <main class="flex-1 px-8 py-4">
         <Show
@@ -37,13 +40,15 @@ export default function App() {
             <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
               <For each={TOOLS}>
                 {(t) => (
-                  <button
-                    class="cursor-pointer rounded-xl border border-line bg-card p-4 text-left hover:border-accent"
+                  <Card
+                    class="cursor-pointer transition-colors hover:border-primary"
                     onClick={() => setTool(t.id)}
                   >
-                    <p class="m-0 text-base font-medium">{t.name}</p>
-                    <p class="m-0 mt-1 text-xs text-muted">{t.desc}</p>
-                  </button>
+                    <CardContent class="p-4">
+                      <CardTitle class="text-base font-medium">{t.name}</CardTitle>
+                      <CardDescription class="mt-1 text-xs">{t.desc}</CardDescription>
+                    </CardContent>
+                  </Card>
                 )}
               </For>
             </div>
@@ -55,7 +60,7 @@ export default function App() {
       <footer class="px-8 py-3 text-xs">
         <Show when={info()}>
           {(v) => (
-            <span class="text-muted">
+            <span class="text-muted-foreground">
               {v().os}/{v().arch} · v{v().appVer} · {v().goVersion}
             </span>
           )}

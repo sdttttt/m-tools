@@ -1,9 +1,16 @@
 import { defineConfig } from "vite";
-import unocss from "unocss/vite";
 import solid from "vite-plugin-solid";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [unocss(), solid()],
+  plugins: [solid()],
+  resolve: {
+    // solid-ui components import via the ~/ alias (see ui.config.json).
+    alias: { "~": path.resolve(rootDir, "src") },
+  },
   server: {
     // The app loads this address during `mygo dev` (devUrl in mygo.config.ts).
     port: 5173,
