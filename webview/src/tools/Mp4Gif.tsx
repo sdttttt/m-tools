@@ -4,6 +4,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { MIN_TRIM_SPAN, TrimTimeline } from "~/components/TrimTimeline";
 import { Label } from "~/components/ui/label";
+import { InfoTip } from "~/components/InfoTip";
 import { Progress } from "~/components/ui/progress";
 import {
   Select,
@@ -249,7 +250,13 @@ export default function Mp4GifTool() {
                 </TextField>
               </div>
               <div class="flex flex-col gap-1">
-                <Label class="text-xs text-muted-foreground">最大宽度</Label>
+                <div class="flex items-center gap-1">
+                  <Label class="text-xs text-muted-foreground">最大宽度</Label>
+                  <InfoTip label="最大宽度说明">
+                    GIF 画面宽度上限，等比缩放、只缩小不放大。例：源视频 1920 宽，填 480 → 输出 480
+                    宽
+                  </InfoTip>
+                </div>
                 <TextField
                   value={String(maxWidth())}
                   onChange={(value: string) => setMaxWidth(parseInt(value) || 480)}

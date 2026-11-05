@@ -3,6 +3,7 @@ import { ImageConv, type ImageInfo, type ImgconvConvertResult } from "~/mygo";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
+import { InfoTip } from "~/components/InfoTip";
 import {
   Select,
   SelectContent,
@@ -36,10 +37,12 @@ const TARGET_BY_LABEL: Record<string, string> = Object.fromEntries(
   Object.entries(TARGET_LABELS).map(([id, label]) => [label, id]),
 );
 
-// targetOptions lists selectable targets; WebP drops out entirely on builds
-// without the codec (the select can't render a disabled string option).
+// targetOptions lists display labels; WebP drops out entirely on builds
+// without the codec (options/value/onChange all live in label-land).
 function targetOptions(supported: boolean): string[] {
-  return Object.keys(TARGET_LABELS).filter((id) => id !== "webp" || supported);
+  return Object.entries(TARGET_LABELS)
+    .filter(([id]) => id !== "webp" || supported)
+    .map(([, label]) => label);
 }
 
 const QUALITY_LABELS: Record<Quality, string> = {
@@ -231,7 +234,7 @@ export default function ImageConvTool() {
               <div class="flex flex-col gap-1">
                 <Label class="text-xs text-muted-foreground">画质（仅影响 JPEG / WebP）</Label>
                 <Select
-                  options={Object.keys(QUALITY_LABELS)}
+                  options={Object.values(QUALITY_LABELS)}
                   value={QUALITY_LABELS[quality()]}
                   onChange={(label) => {
                     if (label) setQuality(QUALITY_BY_LABEL[label] ?? "balanced");
@@ -247,7 +250,12 @@ export default function ImageConvTool() {
                 </Select>
               </div>
               <div class="flex flex-col gap-1">
-                <Label class="text-xs text-muted-foreground">最大宽度（0 = 原尺寸）</Label>
+                <div class="flex items-center gap-1">
+                  <Label class="text-xs text-muted-foreground">最大宽度（0 = 原尺寸）</Label>
+                  <InfoTip label="最大宽度说明">
+                    等比缩放、只缩小不放大。例：4000×3000 的图填 800 → 输出 800×600；填 0 保持原尺寸
+                  </InfoTip>
+                </div>
                 <TextField
                   value={String(maxWidth())}
                   onChange={(value: string) => setMaxWidth(Math.max(0, parseInt(value) || 0))}
