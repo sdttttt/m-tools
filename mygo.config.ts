@@ -3,7 +3,7 @@ import { defineConfig } from "mygo-cli";
 export default defineConfig({
   name: "m-tools",
   identifier: "com.sdttttt.mtools",
-  version: "0.1.0",
+  version: "2026.11.05",
   // Go entrypoint: cmd/m-tools (Go standard layout). The ./ prefix is
   // required — bare "cmd/m-tools" collides with the std library's cmd/ tree.
   main: "./cmd/m-tools",

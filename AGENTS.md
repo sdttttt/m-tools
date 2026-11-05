@@ -184,7 +184,7 @@ m-tools/
 
 ## 版本与构建
 
-- 版本号同步：`mygo.config.ts` 的 `version` 与根包 `app.go` 的 `Version` 常量；发版时一并改。
+- 版本号同步：`mygo.config.ts` 的 `version` 与根包 `app.go` 的 `Version` 常量；发版时一并改。格式为日期版本 `YYYY.MM.DD`（CalVer），如 `2026.11.05`。
 - `mygo build` 会把 `frontendDist`（`dist/`）嵌入二进制；`build/` 下产物按平台输出（macOS app bundle / Windows exe）。
 - 目标平台只有 darwin (amd64/arm64) 和 windows (amd64)；签名/公证脚本将来单独安排。
 

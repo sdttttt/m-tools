@@ -9,4 +9,5 @@ package mtools
 const AppName = "M-Tools"
 
 // Version is the app version, kept in sync with mygo.config.ts.
-const Version = "0.1.0"
+// Date-based (YYYY.MM.DD); bump on release.
+const Version = "2026.11.05"
