@@ -183,7 +183,7 @@ export default function Mp4GifTool() {
                 )}
               >
                 <SelectTrigger class="w-40" aria-label="画质">
-                  <SelectValue />
+                  <SelectValue<string>>{(state) => state.selectedOption()}</SelectValue>
                 </SelectTrigger>
                 <SelectContent />
               </Select>
