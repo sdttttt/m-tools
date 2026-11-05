@@ -1,7 +1,9 @@
 node_modules/
-/dist/
+webview/dist/
 /build/
 /.mygo/
 mygo_windows_*.syso
 /m-tools
 /m-tools.exe
+resources/bin/*
+!resources/bin/README.md

@@ -1,0 +1,13 @@
+{
+  "name": "m-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mygo dev",
+    "build": "mygo build",
+    "generate": "mygo generate"
+  },
+  "devDependencies": {
+    "mygo-cli": "^0.7.4"
+  }
+}
