@@ -4,11 +4,17 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "~/components/ui/card";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import Mp4GifTool from "~/tools/Mp4Gif";
+import ImageConvTool from "~/tools/ImageConv";
 
-type ToolId = "mp4gif";
+type ToolId = "mp4gif" | "imgconv";
 
 const TOOLS: { id: ToolId; name: string; desc: string }[] = [
   { id: "mp4gif", name: "MP4 → GIF", desc: "视频转 GIF 动图，可裁剪、调帧率与画质" },
+  {
+    id: "imgconv",
+    name: "图片格式转换",
+    desc: "PNG / JPEG / GIF / WebP / BMP / TIFF 互转，支持批量",
+  },
 ];
 
 export default function App() {
@@ -55,6 +61,7 @@ export default function App() {
           }
         >
           {tool() === "mp4gif" && <Mp4GifTool />}
+          {tool() === "imgconv" && <ImageConvTool />}
         </Show>
       </main>
       <footer class="px-8 py-3 text-xs">

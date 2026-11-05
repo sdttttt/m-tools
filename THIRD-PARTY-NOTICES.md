@@ -14,11 +14,14 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
 | --------------------------- | -------- | ------------ | ------------------------------------- |
 | `github.com/egoist/mygo`    | v0.7.4   | MIT          | Copyright (c) 2026 MyGo contributors  |
 | `github.com/ebitengine/purego` | v0.11.3 | Apache-2.0 | 见下文 Apache License 2.0             |
+| `golang.org/x/image`        | v0.47.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | `golang.org/x/net`          | v0.62.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | `golang.org/x/text`         | v0.43.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | Go 标准库（含 vendored `golang.org/x/crypto`、`golang.org/x/sys`） | go1.27.3 | BSD-3-Clause | Copyright 2009 The Go Authors |
 
-（模块图中存在但未被链接进本应用的依赖，例如 MyGo 原生 GoUI 渲染器与音频解码库，不在此列。）
+（模块图中存在但未被链接进本应用的依赖，例如 MyGo 原生 GoUI 渲染器与音频解码库，不在此列。
+`-tags with_webp` 构建额外静态链接 `github.com/chai2010/webp` 及其内嵌的 libwebp C 源码，
+见下文第 6 节；默认构建不包含。）
 
 ## 2. 内嵌前端 bundle（`webview/dist`，运行于系统 webview）
 
@@ -78,6 +81,21 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
   获取方式（建议只捆绑 `--disable-gpl --disable-nonfree` 的 LGPL 构建）。
 - **Windows WebView2 Runtime / macOS WKWebView**：操作系统或 OEM 组件，由
   Microsoft / Apple 分发，本项目不再分发它们。
+
+## 6. `-tags with_webp` 构建变体（默认构建不含）
+
+启用 `-tags with_webp` 时，`webp/` 模块会静态链接以下组件以获得 WebP 编解码能力：
+
+| 组件                        | 版本    | 许可         | 版权声明                              |
+| --------------------------- | ------- | ------------ | ------------------------------------- |
+| `github.com/chai2010/webp`  | v1.4.0  | BSD 3-Clause | Copyright (c) 2014 chaishushan@gmail.com |
+| libwebp（chai2010/webp 内嵌 C 源码） | 1.4.0 | BSD 3-Clause | Copyright (c) Google Inc.       |
+
+两者许可全文见下方 BSD 3-Clause（chai2010/webp 的 "Neither the name..." 条款指其作者；
+libwebp 源码与 `PATENTS` 随该模块一同分发，源码获取方式：
+<https://github.com/chai2010/webp> 与 <https://developers.google.com/speed/webp>）。
+默认构建不含 WebP 编解码，应用表现为：WebP 目标格式不可选、WebP 源文件提示需
+`with_webp` 构建。发布带此 tag 的变体时，本节即为其声明保留。
 
 ## 许可全文
 

@@ -42,7 +42,9 @@ m-tools/
 │       └── main.go       # 应用入口：BindAs 服务 + 窗口创建（保持薄）
 ├── internal/             # ⭐ 各工具的后端实现（一个工具一个包）
 │   ├── system/           # System 服务：主机信息 + 窗口主题（system.go / theme.go）
-│   └── mp4gif/           # MP4→GIF 服务：service / wire / media / files / events + reveal 平台文件
+│   ├── mp4gif/           # MP4→GIF 服务：service / wire / media / files / events
+│   ├── imgconv/          # 图片格式转换服务：service / wire / format / decode / convert / files
+│   └── reveal/           # 共享：在系统文件管理器中打开目录（darwin/windows/other 三份）
 ├── app.go                # 根包 mtools：AppName/Version 等应用元数据；go:embed 无法引用上级路径，
 ├── assets_ffmpeg.go      #   所以 with_ffmpeg 的嵌入 hook（//go:build with_ffmpeg）留在根
 ├── go.mod                # module github.com/sdttttt/m-tools（main: ./cmd/m-tools）
@@ -76,6 +78,9 @@ m-tools/
 │   ├── lookup.go         # 工具查找（env → bundled → bin/ → PATH）
 │   ├── probe.go          # Probe + VideoInfo
 │   └── gif.go            # ConvertGIF + GIFRequest/GIFResult/GIFProgress
+├── webp/                 # 独立 gomod：WebP 编解码桥（with_webp 构建才有真实现）
+│   ├── real.go / stub.go #   //go:build with_webp 分界：chai2010/webp vs ErrUnsupported
+│   └── webp.go           #   ErrUnsupported 哨兵 + 包文档
 ├── resources/
 │   ├── icon.png
 │   └── bin/              # with_ffmpeg 构建时捆绑的 ffmpeg（gitignore，留 README）
@@ -100,6 +105,7 @@ m-tools/
 | `cd webview && bun run typecheck/lint/format`       | 前端检查（tsc / oxlint / oxfmt，作用域限 webview/）     |
 | `go vet ./...` / `go build ./...` / `go test ./...` | Go 侧检查（含 cmd/m-tools 与 ffmpeg 模块）              |
 | `go build -tags with_ffmpeg ./cmd/m-tools`          | 捆绑 ffmpeg 的构建变体                                  |
+| `go test -tags with_webp ./internal/imgconv/` 等    | WebP 变体检查（CI 同款，见 CI 小节）                    |
 | `bunx mygo vet .`（根目录）                         | MyGo 静态检查（goroutine 捕获等）                       |
 
 ## 开发约定
@@ -150,12 +156,26 @@ m-tools/
   - `ffmpeg.EnvDir`（`MTOOLS_FFMPEG_DIR`）—— 开发/测试用环境变量覆盖
 - 查找顺序：`$MTOOLS_FFMPEG_DIR` → `with_ffmpeg` 构建内嵌包（解压到用户缓存目录）→ 可执行文件旁的 `bin/` → PATH。
 - Windows 上 ffmpeg/ffprobe 是 console 程序，GUI 版 exe（`-H=windowsgui`）直接启动会弹黑窗口；模块内所有子进程启动都调用 `hideConsole`（`exec_windows.go`，`CREATE_NO_WINDOW`），新增 exec 调用点必须记得调用（`exec_other.go` 为非 Windows 的空实现）。
-- **构建变体**：`go build`（默认，依赖系统/环境 PATH 的 ffmpeg）；`go build -tags with_ffmpeg`（捆绑 `resources/bin/` 下的 ffmpeg/ffprobe 进单二进制，运行时首次解压）。
+- **构建变体**：`go build`（默认，依赖系统/环境 PATH 的 ffmpeg）；`go build -tags with_ffmpeg`（捆绑 `resources/bin/` 下的 ffmpeg/ffprobe 进单二进制，运行时首次解压）。图片工具同理：默认构建无 WebP；`go build -tags with_webp`（静态链接 chai2010/webp + libwebp，需本机 C 工具链；Windows 变体需 mingw-w64 交叉编译，未接入 CI）。两个 tag 可叠加。
 - 转换策略：两遍 palettegen/paletteuse（GIF 质量关键），FPS/宽度不超过源视频；进度经 `-progress pipe:1` 解析后通过 `mp4gifProgress` 事件推给前端（palette 占 30% / encode 占 70%）。
 - 截取范围：前端 `components/TrimTimeline.tsx` 是胶片时间轴（拖起点/终点手柄，拖选中段整体平移，方向键 ±0.1s、Shift ±1s），起点/终点数值输入框与之同步；缩略图经 `Mp4Gif.Thumbnails`（12 帧、160px 宽、data URL）加载，失败时退化为纯色轨道仍可拖拽。
 - 片段预览：「预览片段」按钮调 `Mp4Gif.Preview`（前 3 秒、宽度 ≤320、fps ≤15，质量沿用当前选择）生成小 GIF 以 data URL 内联展示并自动删除临时文件；取消与转换共用 `CancelActive`，两种任务互斥（`begin`/`end` 守卫）；裁剪或参数变化后旧预览自动失效。
-- mygo 服务包装在 `internal/mp4gif/`（`service.go` 生命周期与取消守卫、`wire.go` IPC 类型、`media.go` ffmpeg 桥接、`files.go` 对话框/保存/打开目录、`events.go` 进度事件、`reveal_*.go` 平台差异）；一次只跑一个任务（转换或预览，`CancelActive` 取消）。
+- mygo 服务包装在 `internal/mp4gif/`（`service.go` 生命周期与取消守卫、`wire.go` IPC 类型、`media.go` ffmpeg 桥接、`files.go` 对话框/保存/打开目录、`events.go` 进度事件）；一次只跑一个任务（转换或预览，`CancelActive` 取消）。打开文件夹走共享包 `internal/reveal`（`reveal.Open`，darwin/windows/other 三份平台文件）。
 - 模块测试：ffmpeg 模块含真 ffmpeg 端到端集成测试（lavfi 合成测试视频→转换→GIF 解码校验、时间轴缩略图抽取），无 ffmpeg 时自动 skip。
+
+## 图片格式转换工具要点（imgconv）
+
+- 纯 Go（默认构建）：标准库覆盖 PNG/JPEG/GIF，`golang.org/x/image` 覆盖 BMP/TIFF 与缩放（`draw.CatmullRom`）；**WebP 编解码只在 `-tags with_webp` 构建**（见下方构建变体）。
+- **WebP 封装原则**（镜像 ffmpeg 模块的边界）：cgo 依赖 `chai2010/webp`（内嵌 libwebp C 源码，无需系统 libwebp）只存在于独立 gomod `webp/` 中：
+  - `webp.Supported() bool` —— 当前构建是否有编解码能力
+  - `webp.Decode/DecodeConfig/Encode` —— with_webp 构建为真实现；否则返回哨兵 `webp.ErrUnsupported`
+  - `webp.Register()` —— with_webp 构建在 `imgconv` 的 init 里调用，向 `image` 包注册 webp 魔数；stub 构建是 no-op（保证 `image.Decode` 不误认 webp 字节）
+- mygo 服务包装在 `internal/imgconv/`（`service.go` 互斥/取消守卫、`wire.go` IPC 类型、`format.go` 格式表（magic/decode/encode 闭包）、`decode.go` probe+alpha 检测、`convert.go` 流水线、`files.go` 多选对话框/另存/打开目录）。
+- **转换流水线全在内存**（`bytes.Buffer`，无临时文件）：`image.Decode`（动图取首帧）→ 可选缩放（只缩小不放大，MaxWidth=0 原尺寸）→ 带 alpha 转 JPEG 合白底 → 编码写盘到源文件旁（同名冲突加 `-1` 后缀）。
+- 语义约束：画质（high=92/balanced=82/compact=62）只影响 JPEG/WebP；GIF 由标准库自动 256 色量化；EXIF 元数据丢弃、EXIF 方向不处理（已知限制）；HEIC/AVIF 不支持。
+- **批量 = 前端逐张循环调 `Convert`**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
+- 前端页面 `webview/src/tools/ImageConv.tsx`：挂载先调 `ImageConv.Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。
+- 测试：`internal/imgconv` 合成图 round-trip（矩阵/白底合成/首帧/缩放/命名冲突/取消）+ `webp_probe_test.go`（双构建行为分叉）；`webp/` 模块在两种 tag 下都有测试。
 
 ## 版本与构建
 
@@ -166,9 +186,9 @@ m-tools/
 ## CI 与发布（.github/workflows/ci.yml）
 
 - 路径过滤（不触发 CI 的改动）：仅 `.md`、`LICENSE`、`THIRD-PARTY-NOTICES.md`、`.gitignore`、`.agents/**`。PR 用触发级 `paths-ignore` 直接跳过；master push 由 `changes` job（`dorny/paths-filter@v3`，白名单在 `ci.yml` 的 `changes` job 里维护）判定，纯文档/工作流改动跳过 `test`/`build`；tag push 无条件全跑（否则 release 会被路径过滤误杀，不要给 push 加触发级 `paths`/`paths-ignore`）。
-- push/PR：`test` 跑 gofmt、版本一致性、生成物漂移检查（`bun run generate` 后 `git diff` 为空）、Go vet/build/test、ffmpeg 模块集成测试、`mygo vet` 与前端 format/lint/typecheck；通过后 `build` 在 macos-14 构建 `darwin/universal`、在 windows-latest 构建 `windows/amd64`，安装包经 `upload-artifact` 传递。
+- push/PR：`test` 跑 gofmt、版本一致性、生成物漂移检查（`bun run generate` 后 `git diff` 为空）、Go vet/build/test、webp 变体检查（`go build/vet -tags with_webp ./...` + `webp/` 与 `internal/imgconv` 双 tag 测试）、ffmpeg 模块集成测试、`mygo vet` 与前端 format/lint/typecheck；通过后 `build` 在 macos-14 构建 `darwin/universal`、在 windows-latest 构建 `windows/amd64`，安装包经 `upload-artifact` 传递。
 - 打 tag `vX.Y.Z`：额外触发 `release`，用 `gh release create/upload` 发布 `build/darwin-universal/*.dmg` 与 `build/windows-amd64/*.exe`（含 NSIS setup）；tag 必须与 `mygo.config.ts`/`app.go` 的版本一致，否则 `test` 直接失败。
-- 发布构建未带 `with_ffmpeg` 标签，运行时依赖系统 ffmpeg；要出捆绑版需先把 ffmpeg/ffprobe 放进 `resources/bin` 再调整构建参数（见上文构建变体）。
+- 发布构建未带 `with_ffmpeg` 标签（运行时依赖系统 ffmpeg），也未带 `with_webp` 标签（WebP 选项在 UI 中不可用）；要出捆绑版需先备好对应资源（ffmpeg 放进 `resources/bin` / 本机配好 C 工具链）再调整构建参数（见上文构建变体）。
 - 签名/公证未接入：macOS 目前是 ad-hoc 签名；需要 Developer ID 时配 `macos.signingIdentity` 并注入证书（后续单独做）。
 
 ## 验证清单（提交前 / 大改后）
@@ -182,11 +202,12 @@ m-tools/
 ## 许可
 
 - 原创代码以 **0BSD** 发布（`LICENSE`，版权行 `Copyright (C) 2026 sdttttt`）：零条件、无署名要求，也不含商标授权。
-- 分发产物里的第三方组件**不是** 0BSD：Go 侧 mygo（MIT）、purego（Apache-2.0）、`golang.org/x/*` 与标准库（BSD-3-Clause）；前端 bundle 多数为 MIT，另有 `class-variance-authority`、`@internationalized/number`（Apache-2.0）。完整清单、版权行与许可全文在 `THIRD-PARTY-NOTICES.md`。
+- 分发产物里的第三方组件**不是** 0BSD：Go 侧 mygo（MIT）、purego（Apache-2.0）、`golang.org/x/*`（含 `x/image`）与标准库（BSD-3-Clause）；前端 bundle 多数为 MIT，另有 `class-variance-authority`、`@internationalized/number`（Apache-2.0）。完整清单、版权行与许可全文在 `THIRD-PARTY-NOTICES.md`。
 - `THIRD-PARTY-NOTICES.md` 通过 `mygo.config.ts` 的 `resources` 随应用复制到可执行文件旁（macOS 为 `Contents/Resources`）；改名或删掉该配置会让 MIT / Apache-2.0 的声明缺失。
 - `webview/src/components/ui/` 与 `webview/src/lib/utils.ts` 是复制的 solid-ui / shadcn 代码，保留 MIT 与原作者版权，不能按 0BSD 重标；新增 registry 组件时同样处理。
 - 新增任何会进入二进制或前端 bundle 的依赖后，先确认无 copyleft（GPL / AGPL / MPL / EPL），再把版权行补进 `THIRD-PARTY-NOTICES.md`；仅构建期依赖列在单独小节，不进产物。
 - `-tags with_ffmpeg` 捆绑 ffmpeg 等于分发第三方二进制：发行包需附 ffmpeg 自身许可与源码获取方式，且只用 `--disable-gpl --disable-nonfree` 的 LGPL 构建。
+- `-tags with_webp` 把 chai2010/webp（BSD-3）与内嵌 libwebp（BSD-3 + PATENTS）静态链接进二进制：默认构建不含、不链接，THIRD-PARTY-NOTICES.md 第 6 节即为该变体的声明保留；引入时已核查无 copyleft。
 
 ## Git
 
