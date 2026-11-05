@@ -37,9 +37,9 @@ type GIFRequest struct {
 	StartSec    float64 // trim start; 0 = from the beginning
 	DurationSec float64 // trim length; 0 = to the end
 	TotalSec    float64 // full source duration, only used for progress
-	FPS         int     // 0 → 15, clamped to 5..30, capped by SourceFPS
-	MaxWidth    int     // 0 → 480, clamped to 100..1920, capped by SourceWidth
-	Quality     Quality // invalid/empty → QualityBalanced
+	FPS         int     // 0 → 8, clamped to 5..30, capped by SourceFPS
+	MaxWidth    int     // 0 → 240, clamped to 100..1920, capped by SourceWidth
+	Quality     Quality // invalid/empty → QualityCompact
 	SourceFPS   float64 // source frame rate; when > 0, FPS never exceeds it
 	SourceWidth int     // source width; when > 0, MaxWidth never exceeds it (no upscaling)
 }
@@ -145,13 +145,13 @@ type normalizedGIF struct {
 func normalizeGIF(req GIFRequest) normalizedGIF {
 	fps := req.FPS
 	if fps <= 0 {
-		fps = 15
+		fps = 8
 	}
 	fps = clampInt(fps, 5, 30)
 
 	width := req.MaxWidth
 	if width <= 0 {
-		width = 480
+		width = 240
 	}
 	width = clampInt(width, 100, 1920)
 
@@ -168,7 +168,7 @@ func normalizeGIF(req GIFRequest) normalizedGIF {
 	switch quality {
 	case QualityHigh, QualityBalanced, QualityCompact:
 	default:
-		quality = QualityBalanced
+		quality = QualityCompact
 	}
 
 	if req.StartSec < 0 {

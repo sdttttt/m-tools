@@ -54,9 +54,9 @@ export default function Mp4GifTool() {
   const [trimEnd, setTrimEnd] = createSignal(0);
   const [thumbs, setThumbs] = createSignal<string[]>([]);
   const [thumbLoading, setThumbLoading] = createSignal(false);
-  const [fps, setFps] = createSignal(15);
-  const [maxWidth, setMaxWidth] = createSignal(480);
-  const [quality, setQuality] = createSignal<Quality>("balanced");
+  const [fps, setFps] = createSignal(8);
+  const [maxWidth, setMaxWidth] = createSignal(240);
+  const [quality, setQuality] = createSignal<Quality>("compact");
   const [phase, setPhase] = createSignal<Phase>("idle");
   const [progress, setProgress] = createSignal({ stage: "", percent: 0 });
   const [result, setResult] = createSignal<ConvertResult | null>(null);
@@ -117,8 +117,8 @@ export default function Mp4GifTool() {
       const v = await Mp4Gif.probe(p);
       setInfo(v);
       setTrimEnd(v.durationSec);
-      setFps(Math.max(5, Math.min(15, Math.floor(v.fps) || 15)));
-      setMaxWidth(Math.min(480, Math.max(100, v.width)));
+      setFps(Math.max(8, Math.min(12, Math.floor(v.fps) || 8)));
+      setMaxWidth(Math.min(240, Math.max(100, v.width)));
       setThumbLoading(true);
       Mp4Gif.thumbnails(p)
         .then((frames) => {

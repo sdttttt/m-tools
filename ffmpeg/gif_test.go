@@ -16,16 +16,16 @@ func TestNormalizeGIF(t *testing.T) {
 	if got.MaxWidth != 100 {
 		t.Errorf("MaxWidth clamp: got %d, want 100", got.MaxWidth)
 	}
-	if got.Quality != QualityBalanced {
-		t.Errorf("Quality default: got %q, want %q", got.Quality, QualityBalanced)
+	if got.Quality != QualityCompact {
+		t.Errorf("Quality default: got %q, want %q", got.Quality, QualityCompact)
 	}
 	if got.StartSec != 0 || got.DurationSec != 0 {
 		t.Errorf("trim clamp: got start=%v duration=%v, want 0/0", got.StartSec, got.DurationSec)
 	}
 
 	got = normalizeGIF(GIFRequest{})
-	if got.FPS != 15 || got.MaxWidth != 480 || got.Quality != QualityBalanced {
-		t.Errorf("defaults: got fps=%d width=%d quality=%q, want 15/480/balanced",
+	if got.FPS != 8 || got.MaxWidth != 240 || got.Quality != QualityCompact {
+		t.Errorf("defaults: got fps=%d width=%d quality=%q, want 8/240/compact",
 			got.FPS, got.MaxWidth, got.Quality)
 	}
 }
