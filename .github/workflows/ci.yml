@@ -209,7 +209,9 @@ jobs:
   release:
     name: release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # needs build (a matrix) — gate explicitly, a bare if gets skipped when
+    # GitHub aggregates matrix leg results.
+    if: ${{ !cancelled() && needs.build.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
