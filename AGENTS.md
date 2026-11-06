@@ -199,7 +199,7 @@ m-tools/
 ## CI 与发布（.github/workflows/ci.yml）
 
 - 路径过滤（不触发 CI 的改动）：仅 `.md`、`LICENSE`、`THIRD-PARTY-NOTICES.md`、`.gitignore`、`.agents/**`。PR 用触发级 `paths-ignore` 直接跳过；master push 由 `changes` job（`dorny/paths-filter@v3`，白名单在 `ci.yml` 的 `changes` job 里维护）判定，纯文档/工作流改动跳过 `test`/`build`；tag push 无条件全跑（否则 release 会被路径过滤误杀，不要给 push 加触发级 `paths`/`paths-ignore`）。
-- push/PR：`test` 跑 gofmt、版本一致性、生成物漂移检查（`bun run generate` 后 `git diff` 为空）、Go vet/build/test、webp 变体检查（`go build/vet -tags with_webp ./...` + `webp/` 与 `internal/imgconv` 双 tag 测试）、ffmpeg 模块集成测试、`mygo vet` 与前端 format/lint/typecheck；通过后 `build` 在 macos-14 构建 `darwin/universal`、在 windows-latest 构建 `windows/amd64`，安装包经 `upload-artifact` 传递。
+- push/PR：`test` 跑 gofmt、版本一致性、生成物漂移检查（`bun run generate` 后 `git diff` 为空）、Go vet/build/test、webp 变体检查（`go build/vet -tags with_webp ./...` + `webp/` 与 `internal/imgconv` 双 tag 测试）、ffmpeg 模块集成测试、`mygo vet` 与前端 format/lint/typecheck；通过后 `build` 在 macos-15 构建 `darwin/universal`、在 windows-latest 构建 `windows/amd64`，安装包经 `upload-artifact` 传递。
 - 打 tag `vX.Y.Z`：额外触发 `release`，用 `gh release create/upload` 发布 `build/darwin-universal/*.dmg` 与 `build/windows-amd64/*.exe`（含 NSIS setup）；tag 必须与 `mygo.config.ts`/`app.go` 的版本一致，否则 `test` 直接失败。
 - 发布构建未带 `with_ffmpeg` 标签（运行时依赖系统 ffmpeg），也未带 `with_webp` 标签（WebP 选项在 UI 中不可用）；要出捆绑版需先备好对应资源（ffmpeg 放进 `resources/bin` / 本机配好 C 工具链）再调整构建参数（见上文构建变体）。
 - 签名/公证未接入：macOS 目前是 ad-hoc 签名；需要 Developer ID 时配 `macos.signingIdentity` 并注入证书（后续单独做）。

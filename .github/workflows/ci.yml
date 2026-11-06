@@ -168,7 +168,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: darwin/universal
             artifact: macos
           - os: windows-latest
