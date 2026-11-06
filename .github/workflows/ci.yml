@@ -171,9 +171,13 @@ jobs:
           - os: macos-15
             platform: darwin/universal
             artifact: macos
+            # One glob per artifact: files land at the artifact root, so the
+            # release job's "dist/*" expands to files, not directories.
+            paths: build/darwin-universal/*.dmg
           - os: windows-latest
             platform: windows/amd64
             artifact: windows
+            paths: build/windows-amd64/*.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -201,9 +205,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: |
-            build/darwin-universal/*.dmg
-            build/windows-amd64/*.exe
+          path: ${{ matrix.paths }}
           if-no-files-found: error
 
   release:
