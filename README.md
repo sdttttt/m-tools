@@ -1,6 +1,9 @@
 # M-Tools
 
-macOS / Windows 桌面小工具箱。单个 Go 二进制 + 系统 webview，体积小、内存占用低。
+macOS / Windows 的一个媒体处理工具箱，为了方便网上冲浪做的。
+
+<img width="671" height="554" alt="图片" src="https://github.com/user-attachments/assets/cbb3dd26-04de-43f9-8509-3c2e8b7a112c" />
+
 
 ## 功能
 
