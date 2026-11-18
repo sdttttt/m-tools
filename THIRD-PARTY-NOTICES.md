@@ -12,11 +12,11 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
 
 | 模块                        | 版本     | 许可         | 版权声明                              |
 | --------------------------- | -------- | ------------ | ------------------------------------- |
-| `github.com/egoist/mygo`    | v0.7.4   | MIT          | Copyright (c) 2026 MyGo contributors  |
+| `github.com/egoist/mygo`    | v0.10.0  | MIT          | Copyright (c) 2026 MyGo contributors  |
 | `github.com/ebitengine/purego` | v0.11.3 | Apache-2.0 | 见下文 Apache License 2.0             |
-| `golang.org/x/image`        | v0.47.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
-| `golang.org/x/net`          | v0.62.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
-| `golang.org/x/text`         | v0.43.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
+| `golang.org/x/image`        | v0.48.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
+| `golang.org/x/net`          | v0.63.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
+| `golang.org/x/text`         | v0.44.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | `gopkg.in/yaml.v3`          | v3.0.1   | Apache-2.0 及 MIT 双许可 | Copyright 2011-2019 Canonical Ltd   |
 | Go 标准库（含 vendored `golang.org/x/crypto`、`golang.org/x/sys`） | go1.27.3 | BSD-3-Clause | Copyright 2009 The Go Authors |
 
@@ -30,7 +30,7 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
 
 | 包                                                                                         | 版本              | 版权声明                                         |
 | ------------------------------------------------------------------------------------------ | ----------------- | ------------------------------------------------ |
-| `solid-js`                                                                                 | 1.9.18            | Copyright (c) 2016-2025 Ryan Carniato             |
+| `solid-js`                                                                                 | 1.9.19            | Copyright (c) 2016-2025 Ryan Carniato             |
 | `@kobalte/core`                                                                            | 0.13.14           | Copyright (c) 2024 jer3m01                       |
 | `@kobalte/utils`                                                                           | 0.9.2             | Copyright (c) 2022 Fabien Marie-Louise           |
 | `@corvu/utils`                                                                             | 0.4.2             | Copyright (c) 2023-2024 Jasmin Noetzli           |
@@ -40,7 +40,7 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
 | `@solid-primitives/*`（event-listener、keyed、map、media、props、refs、resize-observer、rootless、static-store、trigger、utils） | 2.4.6 / 1.5.3 / 0.4.13 / 2.3.6 / 3.2.4 / 1.1.4 / 2.2.0 / 1.5.4 / 0.1.4 / 1.2.4 / 6.4.1 | Copyright (c) 2021 Solid Primitives Working Group |
 | `clsx`                                                                                     | 2.1.1             | Copyright (c) Luke Edwards                       |
 | `tailwind-merge`                                                                           | 3.7.0             | Copyright (c) 2021 Dany Castillo                 |
-| `mygo-runtime`                                                                             | 0.7.4             | Copyright (c) 2026 MyGo contributors             |
+| `mygo-runtime`                                                                             | 0.10.0            | Copyright (c) 2026 MyGo contributors             |
 
 ### Apache-2.0
 

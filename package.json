@@ -9,6 +9,6 @@
     "generate": "mygo generate"
   },
   "devDependencies": {
-    "mygo-cli": "^0.7.4"
+    "mygo-cli": "^0.10.0"
   }
 }
