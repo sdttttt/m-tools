@@ -48,6 +48,8 @@ m-tools/
 │   ├── imgresize/        # 图片大小服务：service / wire / files（比例/精确尺寸，可放大）
 │   ├── imgopt/           # 图片质量优化服务：optimize（各格式无损策略）/ wire / service / files
 │   ├── imgfile/          # 图片工具共享：选图/保存对话框、复制另存、打开目录
+│   ├── subconv/          # 订阅转换服务：node 中间表示 + parse(v2ray/clash/singbox)
+│   │                     #   + emit(同三向) + sniff 自动识别 + service/fetch/saveas
 │   └── reveal/           # 共享：在系统文件管理器中打开目录（darwin/windows/other 三份）
 ├── app.go                # 根包 mtools：AppName/Version 等应用元数据；go:embed 无法引用上级路径，
 ├── assets_ffmpeg.go      #   所以 with_ffmpeg 的嵌入 hook（//go:build with_ffmpeg）留在根
@@ -189,6 +191,17 @@ m-tools/
 - **批量 = 前端逐张循环调单张 API**（单张 IPC 毫秒级，前端逐行更新状态/失败不阻塞/取消即停止发起下一张），后端不做批量 API，只有单任务互斥守卫。`Probe` 永不报错——不可识别/不支持的源通过 `skipReason` 让前端标"跳过"。
 - 前端共享 `webview/src/lib/img.ts`（格式/画质标签表、probeAll、行状态——六态含 `optimizing`）；页面 `tools/ImageConv.tsx`、`tools/ImageResize.tsx`、`tools/ImageOptimize.tsx`：挂载先调 `Supported()`，stub 构建下 WebP 选项直接从下拉里剔除并在选图卡注明需 `with_webp` 构建。**Select 的 options/value/onChange 必须同域**（都用标签字符串），且选项字符串必须与 value **逐字相等**——任何展示性修饰（如给当前项加"（当前）"后缀）都会让 Kobalte 匹配失败、触发框空白；需要额外信息用 InfoTip 或页面文案表达，不要改选项文本（Kobalte 按 `value ∈ options` 回显）。
 - 测试：`internal/imgfmt` 合成图 round-trip（矩阵/白底合成/首帧/上下采样/部分轴/命名冲突/取消 + stub webp 行为）；`internal/imgresize` 的 `resolveSize`（百分比/锁比例推导/取整/非法输入）；`internal/imgopt` 各格式策略（噪声 PNG 收缩+像素等值、palette 路径、半透明不走 palette、JPEG 剥段保 DQT/EOI、动/静 GIF、BMP/未知跳过、APNG、守卫不写更大文件）；`webp/` 模块在两种 tag 下都有测试。
+
+## 订阅转换要点（subconv）
+
+- **全自研实现，不 import 外部转换库**（可参考 proxykit / sing-box 文档的字段约定，但源码自己维护）；唯一新增依赖 `gopkg.in/yaml.v3`（Apache-2.0/MIT）。
+- **统一中间表示 `Node`**：三种输入格式（v2ray base64 分享链接、Clash/mihomo YAML、sing-box ≥1.8 JSON）各自 parse 成 `[]Node`，三种输出各自 emit 自 `[]Node`，无 9 条直连路径。支持 7 协议：vless（含 Reality）/ vmess / trojan / ss（SIP002）/ hysteria2 / tuic / anytls。
+- **产品形态：裸节点表**——Clash 输出只有 `proxies:`（无 groups/rules，mihomo 方言），sing-box 输出只有 `outbounds` 数组（可合并进完整配置），v2ray 输出是 base64 包裹的逐行分享链接。内置 outbound（selector/urltest/direct/dns）与不支持项逐节点进 `skipped`（含原因），不静默丢弃。
+- **本地转换是卖点**：订阅 URL 由 Go 侧 `net/http` 拉取（15s 超时、16MB 上限、仅 http/https），转换全程内存进行、不上传任何第三方。
+- sing-box ≥1.8  outbound 字段（tls 嵌套块、transport 块）；不支持 legacy 格式。字段约定已对照官方文档校验：uTLS 指纹在 `tls.utls{enabled,fingerprint}` 块（1.8+，兼容读旧的扁平 `tls.fingerprint`）；`disable_sni` 在 tls 块内；http 传输的 host 是列表（ws 才走 headers.Host；httpupgrade 是 host 字符串）。anytls 出站需 sing-box ≥1.12（1.12 才有 anytls 类型）。
+- ss 插件（SIP003）：`obfs-local`/`v2ray-plugin` 三向透传（sing-box 走 `plugin`/`plugin_opts`），其余插件（gost-plugin 等）向 sing-box 输出时 skip。传输层只支持 tcp/ws/grpc/http(h2)/httpupgrade；kcp/quic 等进 skip。
+- 服务绑定名 `SubConv`（`BindAs` 指针），API：`Fetch` / `Convert(text, from, to)` / `SaveAs(content, name)` / `CancelActive`，单任务互斥守卫沿用 mp4gif 的 begin/end。前端 `webview/src/tools/SubConv.tsx`：URL 拉取 + 粘贴输入、源/目标格式下拉、输出复制/另存、跳过列表。
+- 测试：`internal/subconv` 每协议合成 Node 三向 round-trip、完整配置只取节点（clash proxies:/sing-box outbounds）、sniff 四分支、skip 统计（插件 ss→singbox、kcp→clash）、特殊字符名称/密码往返、垃圾输入报错。
 
 ## 版本与构建
 

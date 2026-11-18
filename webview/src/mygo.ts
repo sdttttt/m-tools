@@ -26,6 +26,12 @@ export interface ConvertResult {
   previewDataURL: string;
 }
 
+/** FetchResult is the raw body of a fetched subscription. */
+export interface FetchResult {
+  body: string;
+  contentType: string;
+}
+
 /** GIFProgress reports conversion progress; Percent is the overall 0..100. */
 export interface GIFProgress {
   stage: Stage;
@@ -167,8 +173,45 @@ export interface ResizeResult {
   previewDataURL: string;
 }
 
+/**
+ * Skipped reports one node that did not survive parsing or emitting,
+ * with the reason shown to the user.
+ */
+export interface Skipped {
+  name: string;
+  reason: string;
+}
+
 /** Stage names reported through GIFProgress.Stage. */
 export type Stage = "palette" | "encode";
+
+/** ConvertRequest asks for one subscription conversion. */
+export interface SubconvConvertRequest {
+  /** subscription body or share-link list */
+  text: string;
+  /** auto | v2ray | clash | singbox */
+  from: string;
+  /** v2ray | clash | singbox */
+  to: string;
+}
+
+/** ConvertResult reports one conversion outcome. */
+export interface SubconvConvertResult {
+  /** converted subscription text */
+  output: string;
+  /** detected (or given) input format */
+  from: string;
+  /** output format */
+  to: string;
+  /** nodes parsed from the input */
+  total: number;
+  /** nodes present in the output */
+  converted: number;
+  /** parsed nodes per protocol */
+  byProtocol: Record<string, number>;
+  /** nodes dropped, with reasons */
+  skipped: Skipped[];
+}
 
 /** SystemInfo describes the machine the app runs on. */
 export interface SystemInfo {
@@ -444,6 +487,40 @@ export const ImageOptimize = {
    */
   supported(): Promise<boolean> {
     return call("ImageOptimize.Supported");
+  },
+} as const;
+
+/**
+ * SubConv converts proxy subscriptions between the v2ray, Clash and
+ * sing-box formats. Everything runs locally: Fetch downloads a subscription
+ * body over plain HTTP and Convert parses + re-emits it in memory.
+ */
+export const SubConv = {
+  /** CancelActive stops the running fetch or conversion, if any. */
+  cancelActive(): Promise<void> {
+    return call("SubConv.CancelActive");
+  },
+  /**
+   * Convert parses the input text in the `from` format and re-emits it in
+   * the `to` format. Per-node problems are reported in the result instead of
+   * failing the whole conversion.
+   */
+  convert(req: SubconvConvertRequest): Promise<SubconvConvertResult> {
+    return call("SubConv.Convert", req);
+  },
+  /**
+   * Fetch downloads a subscription body. Only http(s) URLs are accepted; the
+   * download never leaves the user's machine through any third party.
+   */
+  fetch(rawURL: string): Promise<FetchResult> {
+    return call("SubConv.Fetch", rawURL);
+  },
+  /**
+   * SaveAs shows a native save dialog and writes the converted text there.
+   * Returns the destination path, or "" when canceled.
+   */
+  saveAs(content: string, defaultName: string): Promise<string> {
+    return call("SubConv.SaveAs", content, defaultName);
   },
 } as const;
 

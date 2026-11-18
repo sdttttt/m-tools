@@ -17,6 +17,7 @@ bundle（第 2 节）与从 registry 复制的源码（第 3 节）。这些第�
 | `golang.org/x/image`        | v0.47.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | `golang.org/x/net`          | v0.62.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
 | `golang.org/x/text`         | v0.43.0  | BSD-3-Clause | Copyright 2009 The Go Authors         |
+| `gopkg.in/yaml.v3`          | v3.0.1   | Apache-2.0 及 MIT 双许可 | Copyright 2011-2019 Canonical Ltd   |
 | Go 标准库（含 vendored `golang.org/x/crypto`、`golang.org/x/sys`） | go1.27.3 | BSD-3-Clause | Copyright 2009 The Go Authors |
 
 （模块图中存在但未被链接进本应用的依赖，例如 MyGo 原生 GoUI 渲染器与音频解码库，不在此列。

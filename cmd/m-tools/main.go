@@ -11,6 +11,7 @@ import (
 	"github.com/sdttttt/m-tools/internal/imgopt"
 	"github.com/sdttttt/m-tools/internal/imgresize"
 	"github.com/sdttttt/m-tools/internal/mp4gif"
+	"github.com/sdttttt/m-tools/internal/subconv"
 	"github.com/sdttttt/m-tools/internal/system"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	mygo.BindAs("ImageConv", &imgconv.Service{})
 	mygo.BindAs("ImageResize", &imgresize.Service{})
 	mygo.BindAs("ImageOptimize", &imgopt.Service{})
+	mygo.BindAs("SubConv", &subconv.Service{})
 
 	mygo.App.WhenReady(func() {
 		mygo.NewWindow(mygo.WindowOptions{

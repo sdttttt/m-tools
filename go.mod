@@ -14,6 +14,7 @@ require (
 	github.com/ebitengine/purego v0.11.3 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/sdttttt/m-tools/ffmpeg => ./ffmpeg

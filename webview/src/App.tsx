@@ -7,8 +7,9 @@ import Mp4GifTool from "~/tools/Mp4Gif";
 import ImageConvTool from "~/tools/ImageConv";
 import ImageResizeTool from "~/tools/ImageResize";
 import ImageOptimizeTool from "~/tools/ImageOptimize";
+import SubConvTool from "~/tools/SubConv";
 
-type ToolId = "mp4gif" | "imgconv" | "imgresize" | "imgoptimize";
+type ToolId = "mp4gif" | "imgconv" | "imgresize" | "imgoptimize" | "subconv";
 
 const TOOLS: { id: ToolId; name: string; desc: string }[] = [
   { id: "mp4gif", name: "MP4 → GIF", desc: "视频转 GIF 动图，可裁剪、调帧率与画质" },
@@ -26,6 +27,11 @@ const TOOLS: { id: ToolId; name: string; desc: string }[] = [
     id: "imgoptimize",
     name: "图片质量优化",
     desc: "像素级无损压缩 PNG / JPEG / TIFF / GIF，输出 -min 副本",
+  },
+  {
+    id: "subconv",
+    name: "订阅转换",
+    desc: "v2ray / Clash / sing-box 订阅互转，本地解析不上传，支持 7 种协议",
   },
 ];
 
@@ -78,6 +84,7 @@ export default function App() {
             {tool() === "imgconv" && <ImageConvTool />}
             {tool() === "imgresize" && <ImageResizeTool />}
             {tool() === "imgoptimize" && <ImageOptimizeTool />}
+            {tool() === "subconv" && <SubConvTool />}
           </FadeSwap>
         </Show>
       </main>
