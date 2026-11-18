@@ -211,6 +211,8 @@ export interface SubconvConvertResult {
   byProtocol: Record<string, number>;
   /** nodes dropped, with reasons */
   skipped: Skipped[];
+  /** names of the converted nodes, in output order */
+  names: string[];
 }
 
 /** SystemInfo describes the machine the app runs on. */

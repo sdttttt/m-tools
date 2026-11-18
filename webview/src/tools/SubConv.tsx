@@ -109,6 +109,24 @@ export default function SubConvTool() {
     if (dest) setNotice(`已保存到 ${dest}`);
   }
 
+  async function copyNames() {
+    const r = result();
+    if (!r) return;
+    try {
+      await navigator.clipboard.writeText(namesText(r));
+      setNotice("节点名称已复制");
+    } catch {
+      setError("复制失败，请手动全选复制");
+    }
+  }
+
+  // Names ride along in the output's own data language: a YAML array for
+  // clash targets, JSON otherwise. Double-quoted scalars keep YAML honest
+  // about names full of special characters.
+  const namesText = (r: SubconvConvertResult) =>
+    r.to === "clash" ? r.names.map((n) => `- ${JSON.stringify(n)}`).join("\n") : JSON.stringify(r.names);
+  const namesLabel = (r: SubconvConvertResult) => (r.to === "clash" ? "YAML 数组" : "JSON 数组");
+
   const statsLine = (r: SubconvConvertResult) => {
     const parts = Object.entries(r.byProtocol)
       .filter(([, n]) => n > 0)
@@ -216,6 +234,20 @@ export default function SubConvTool() {
                 value={r().output}
                 spellcheck={false}
               />
+              <div class="flex flex-col gap-1">
+                <Label class="text-xs text-muted-foreground">节点名称（{namesLabel(r())}）</Label>
+                <div class="flex items-start gap-2">
+                  <textarea
+                    class="h-16 min-h-16 w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    readOnly
+                    value={namesText(r())}
+                    spellcheck={false}
+                  />
+                  <MotionButton variant="outline" size="sm" class="shrink-0" onClick={copyNames}>
+                    复制
+                  </MotionButton>
+                </div>
+              </div>
               <div class="flex items-center gap-3">
                 <MotionButton variant="outline" size="sm" onClick={copyOutput}>
                   复制

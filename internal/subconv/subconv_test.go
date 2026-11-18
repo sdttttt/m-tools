@@ -390,6 +390,14 @@ func TestConvertAuto(t *testing.T) {
 	if len(res.Skipped) != 0 {
 		t.Fatalf("sample set should fully convert to singbox: %+v", res.Skipped)
 	}
+	if len(res.Names) != res.Converted {
+		t.Fatalf("names=%d want %d: %+v", len(res.Names), res.Converted, res.Names)
+	}
+	for _, name := range res.Names {
+		if name == "" {
+			t.Fatalf("empty name in %+v", res.Names)
+		}
+	}
 	back, err := svc.Convert(ConvertRequest{Text: res.Output, From: "auto", To: "clash"})
 	if err != nil {
 		t.Fatal(err)

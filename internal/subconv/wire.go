@@ -16,6 +16,7 @@ type ConvertResult struct {
 	Converted  int            `json:"converted"`  // nodes present in the output
 	ByProtocol map[string]int `json:"byProtocol"` // parsed nodes per protocol
 	Skipped    []Skipped      `json:"skipped"`    // nodes dropped, with reasons
+	Names      []string       `json:"names"`      // names of the converted nodes, in output order
 }
 
 // FetchResult is the raw body of a fetched subscription.

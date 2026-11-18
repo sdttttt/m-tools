@@ -143,6 +143,14 @@ func (s *Service) Convert(req ConvertRequest) (ConvertResult, error) {
 	parseSkipped := len(skipped)
 	skipped = append(skipped, emitSkipped...)
 
+	// Names reflect exactly what made it into the output: re-parse the
+	// emitted text rather than guessing which nodes the emitters kept.
+	emitted, _, _ := Parse([]byte(output), to)
+	names := make([]string, len(emitted))
+	for i, n := range emitted {
+		names[i] = n.DisplayName()
+	}
+
 	return ConvertResult{
 		Output:     output,
 		From:       string(from),
@@ -151,6 +159,7 @@ func (s *Service) Convert(req ConvertRequest) (ConvertResult, error) {
 		Converted:  len(nodes) - len(emitSkipped),
 		ByProtocol: countByProtocol(nodes),
 		Skipped:    skipped,
+		Names:      names,
 	}, nil
 }
 
